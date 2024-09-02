@@ -130,3 +130,21 @@ Vous pouvez utiliser [Postman](https://www.postman.com/) pour interagir avec l'A
 - **Télécharger un Objet**: La réponse doit contenir le contenu de l'objet.
 - **Supprimer un Objet**: La réponse doit être HTTP 204 No Content.
 - **Supprimer un Bucket**: La réponse doit être HTTP 204 No Content.
+
+
+### Visualisation dans l'Interface Graphique
+
+L'interface graphique de MinIO est une couche de visualisation qui permet de voir et de gérer les ressources (buckets et objets) stockées dans MinIO. Les actions effectuées via l'API, telles que la création d'un bucket ou le téléchargement d'un objet, sont immédiatement reflétées dans l'interface graphique.
+
+#### Exemple d'Interaction :
+
+- **Création d'un Bucket via l'API**:
+  - Lorsque vous créez un bucket en envoyant une requête `POST` à l'API (`http://localhost:8080/buckets`), MinIO crée le bucket en interne.
+  - Si vous ouvrez ensuite l'interface graphique de MinIO (disponible à `http://localhost:9000`), vous verrez le nouveau bucket apparaître dans la liste des buckets.
+
+- **Téléchargement d'un Objet via l'API**:
+  - De même, lorsque vous téléchargez un objet dans un bucket en utilisant une requête `PUT` via l'API, cet objet devient immédiatement visible dans le bucket correspondant dans l'interface graphique de MinIO.
+
+- **Suppression via l'Interface Graphique**:
+  - Si vous supprimez un bucket ou un objet en utilisant l'interface graphique de MinIO, ces changements seront également reflétés lorsque vous listerez les buckets ou les objets via l'API.
+
