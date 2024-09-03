@@ -1,8 +1,8 @@
 package main
 
 import (
-	"./storage"
 	"net/http"
+	"myS3/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,7 +27,7 @@ func main() {
 		bucketName := req.BucketName
 
 		// Créer le bucket en envoyant une requête HTTP
-		err := storage.createBucket(bucketName)
+		err := storage.AjoutBucket(bucketName)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -39,5 +39,3 @@ func main() {
 	// Démarrer le serveur
 	r.Run(":8080")
 }
-
-// Fonction pour créer un bucket en envoyant une requête HTTP S3

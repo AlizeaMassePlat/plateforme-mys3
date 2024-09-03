@@ -1,32 +1,46 @@
 package storage
+
 import (
-	"net/http"
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"net/http"
+	"time"
 )
 
-
-func createBucket(bucketName string) error {
-	// Définir l'endpoint et les clés d'accès
-	endpoint := "http://minio:9000" // Remplacez par l'endpoint de votre service S3
+func AjoutBucket(bucketName string) error {
+	// Define the endpoint and access keys
+	endpoint := "http://localhost:9000"
 	accessKeyID := "minioadmin"
 	secretAccessKey := "minioadmin"
-	region := "us-east-1" // Remplacez par votre région
+	region := "us-east-1"
+	service := "s3"
 
-	// Construire l'URL de la requête
+	// Build the request URL
 	url := fmt.Sprintf("%s/%s", endpoint, bucketName)
 
-	// Créer la requête HTTP PUT pour créer un bucket
-	req, err := http.NewRequest("PUT", url, nil)
+	// Create HTTP PUT request to create the bucket
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(nil))
 	if err != nil {
 		return err
 	}
 
-	// Ajouter les en-têtes nécessaires pour l'authentification et la compatibilité S3
-	req.Header.Add("Host", bucketName)
-	req.Header.Add("Date", getCurrentDateHeader()) // Implémentez une fonction pour obtenir la date au format requis
-	req.Header.Add("Authorization", generateAuthorizationHeader(req, accessKeyID, secretAccessKey))
+	// Add headers for authentication and S3 compatibility
+	amzDate := time.Now().UTC().Format("20060102T150405Z")
+	date := time.Now().UTC().Format("20060102")
+	req.Header.Add("x-amz-date", amzDate)
+	req.Header.Add("Host", "localhost:9000")
+	req.Header.Add("Content-Length", "0")
 
-	// Envoyer la requête HTTP
+	// Generate the signature
+	signature := generateSignature(req, accessKeyID, secretAccessKey, date, region, service)
+	authHeader := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s/%s/%s/aws4_request, SignedHeaders=host;x-amz-date, Signature=%s",
+		accessKeyID, date, region, service, signature)
+	req.Header.Add("Authorization", authHeader)
+
+	// Send the HTTP request
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -34,27 +48,41 @@ func createBucket(bucketName string) error {
 	}
 	defer resp.Body.Close()
 
-	// Lire la réponse
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to create bucket: %s", body)
+		return fmt.Errorf("failed to create bucket: %s", resp.Status)
 	}
 
 	return nil
 }
 
-// Exemple de fonction pour obtenir l'en-tête de la date (à implémenter)
-func getCurrentDateHeader() string {
-	// Implémentez cette fonction pour retourner la date au format requis par S3
-	return "Sat, 30 Sep 2023 00:00:00 GMT"
+func generateSignature(req *http.Request, accessKeyID, secretAccessKey, date, region, service string) string {
+	canonicalURI := req.URL.Path
+	canonicalHeaders := fmt.Sprintf("host:%s\nx-amz-date:%s\n", req.Host, req.Header.Get("x-amz-date"))
+	signedHeaders := "host;x-amz-date"
+	payloadHash := sha256.Sum256([]byte{}) // Hash for an empty payload
+
+	// Create canonical request
+	canonicalRequest := fmt.Sprintf("%s\n%s\n\n%s\n%s\n%s", req.Method, canonicalURI, "", canonicalHeaders, signedHeaders, hex.EncodeToString(payloadHash[:]))
+
+	// Create string to sign
+	canonicalRequestHash := sha256.Sum256([]byte(canonicalRequest))
+	canonicalRequestHashStr := hex.EncodeToString(canonicalRequestHash[:])
+	stringToSign := fmt.Sprintf("AWS4-HMAC-SHA256\n%s\n%s/%s/%s/aws4_request\n%s", req.Header.Get("x-amz-date"), date, region, service, canonicalRequestHashStr)
+
+	// Calculate the signature
+	kDate := hmacSHA256([]byte("AWS4"+secretAccessKey), date)
+	kRegion := hmacSHA256(kDate, region)
+	kService := hmacSHA256(kRegion, service)
+	kSigning := hmacSHA256(kService, "aws4_request")
+	signature := hmacSHA256(kSigning, stringToSign)
+
+	return hex.EncodeToString(signature)
 }
 
-// Exemple de fonction pour générer l'en-tête d'autorisation (à implémenter)
-func generateAuthorizationHeader(req *http.Request, accessKeyID, secretAccessKey string) string {
-	// Implémentez cette fonction pour générer l'en-tête d'autorisation basé sur votre clé d'accès et clé secrète
-	return "AWS " + accessKeyID + ":" + secretAccessKey
+
+// hmacSHA256 calculates an HMAC-SHA256 hash
+func hmacSHA256(key []byte, data string) []byte {
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(data))
+	return h.Sum(nil)
 }

@@ -1,4 +1,4 @@
-module my-s3-clone
+module myS3
 
 go 1.21
 
