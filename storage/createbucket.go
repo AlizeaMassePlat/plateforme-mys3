@@ -1,3 +1,10 @@
+package storage
+import (
+	"net/http"
+	"fmt"
+)
+
+
 func createBucket(bucketName string) error {
 	// Définir l'endpoint et les clés d'accès
 	endpoint := "http://minio:9000" // Remplacez par l'endpoint de votre service S3
