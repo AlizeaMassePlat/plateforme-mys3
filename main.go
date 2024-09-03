@@ -1,111 +1,43 @@
 package main
 
 import (
-	"encoding/xml"
-	"io"
+	"./storage"
 	"net/http"
-	"my-s3-clone/storage"
+
+	"github.com/gin-gonic/gin"
 )
 
+type CreateBucketRequest struct {
+	BucketName string `json:"bucket_name" binding:"required"`
+}
+
 func main() {
-	storage.InitMinioClient("minio:9000", "minioadmin", "minioadmin")
+	// Initialiser le routeur Gin
+	r := gin.Default()
 
-	http.HandleFunc("/buckets", handleBuckets)
-	http.HandleFunc("/buckets/", handleObjects)
-	http.ListenAndServe(":8080", nil)
+	// Route pour créer un bucket
+	r.POST("/create-bucket", func(c *gin.Context) {
+		var req CreateBucketRequest
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		bucketName := req.BucketName
+
+		// Créer le bucket en envoyant une requête HTTP
+		err := storage.createBucket(bucketName)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Bucket created successfully", "bucket": bucketName})
+	})
+
+	// Démarrer le serveur
+	r.Run(":8080")
 }
 
-func handleBuckets(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		var bucket storage.Bucket
-		body, _ := io.ReadAll(r.Body) 
-		xml.Unmarshal(body, &bucket)
-
-		err := storage.CreateBucket(bucket.Name) 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		w.WriteHeader(http.StatusCreated) 
-
-	case http.MethodGet:
-		buckets, err := storage.ListBuckets() 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/xml")
-		xml.NewEncoder(w).Encode(buckets)
-
-	case http.MethodDelete:
-		bucketName := r.URL.Path[len("/buckets/"):]
-		err := storage.DeleteBucket(bucketName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
-
-func handleObjects(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPut:
-		bucketName := r.URL.Path[len("/buckets/"):]
-		objectName := r.URL.Query().Get("object")
-
-		bucket, err := storage.GetBucket(bucketName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		data, _ := io.ReadAll(r.Body) 
-		err = bucket.PutObject(objectName, data)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusCreated) 
-	case http.MethodGet:
-		bucketName := r.URL.Path[len("/buckets/"):]
-		objectName := r.URL.Query().Get("object")
-
-		bucket, err := storage.GetBucket(bucketName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		object, err := bucket.GetObject(objectName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/xml")
-		xml.NewEncoder(w).Encode(object)
-
-	case http.MethodDelete:
-		bucketName := r.URL.Path[len("/buckets/"):]
-		objectName := r.URL.Query().Get("object")
-
-		bucket, err := storage.GetBucket(bucketName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		err = bucket.DeleteObject(objectName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent) 
-	}
-}
+// Fonction pour créer un bucket en envoyant une requête HTTP S3
