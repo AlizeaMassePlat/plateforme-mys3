@@ -8,18 +8,26 @@ import (
 )
 
 func main() {
+	// initialisation du client minio
 	storage.InitMinioClient("minio:9000", "minioadmin", "minioadmin")
 
+	// gestionnaire des chemins URL
 	http.HandleFunc("/buckets", handleBuckets)
 	http.HandleFunc("/buckets/", handleObjects)
+	// lance le server http
 	http.ListenAndServe(":8080", nil)
 }
 
+// gestion des requêtes http des buckets
 func handleBuckets(w http.ResponseWriter, r *http.Request) {
+	// switch en fonction du type de requête
 	switch r.Method {
 	case http.MethodPost:
+		// création d'un nouveau bucket
+			// déclaration d'une variable de type "storage.Bucket"
 		var bucket storage.Bucket
-		body, _ := io.ReadAll(r.Body) 
+			// lecture du corps de la requête 
+		body,_ := io.ReadAll(r.Body) 
 		xml.Unmarshal(body, &bucket)
 
 		err := storage.CreateBucket(bucket.Name) 

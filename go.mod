@@ -1,6 +1,8 @@
 module my-s3-clone
 
-go 1.20
+go 1.21
+
+toolchain go1.23.0
 
 require github.com/minio/minio-go/v7 v7.0.76
 
