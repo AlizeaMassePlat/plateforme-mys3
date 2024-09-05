@@ -1,119 +1,101 @@
 package main
 
 import (
-	"encoding/xml"
-	"io"
+	"fmt"
 	"net/http"
+	"strings"
 	"my-s3-clone/storage"
 )
 
 func main() {
-	// initialisation du client minio
+	// Initialisation du client MinIO
 	storage.InitMinioClient("minio:9000", "minioadmin", "minioadmin")
 
-	// gestionnaire des chemins URL
-	http.HandleFunc("/buckets", handleBuckets)
-	http.HandleFunc("/buckets/", handleObjects)
-	// lance le server http
-	http.ListenAndServe(":8080", nil)
+	// Gestionnaire des routes HTTP
+	http.HandleFunc("/", handleRequest)
+
+	// Lance le serveur HTTP
+	fmt.Println("Serveur en cours d'exécution sur :9090")
+	http.ListenAndServe(":9090", nil)
 }
 
-// gestion des requêtes http des buckets
-func handleBuckets(w http.ResponseWriter, r *http.Request) {
-	// switch en fonction du type de requête
-	switch r.Method {
-	case http.MethodPost:
-		// création d'un nouveau bucket
-			// déclaration d'une variable de type "storage.Bucket"
-		var bucket storage.Bucket
-			// lecture du corps de la requête 
-		body,_ := io.ReadAll(r.Body) 
-		xml.Unmarshal(body, &bucket)
-
-		err := storage.CreateBucket(bucket.Name) 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		w.WriteHeader(http.StatusCreated) 
-
-	case http.MethodGet:
-		buckets, err := storage.ListBuckets() 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/xml")
-		xml.NewEncoder(w).Encode(buckets)
-
-	case http.MethodDelete:
-		bucketName := r.URL.Path[len("/buckets/"):]
-		err := storage.DeleteBucket(bucketName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
+// Gestion des requêtes HTTP
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	// Vérifie si c'est une requête de sondage
+	if strings.Contains(r.URL.Path, "/probe-") {
+		ProbeHandler(w, r)
+		return
 	}
-}
 
+	// Extraire le chemin de la requête
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(pathParts) < 1 {
+		http.Error(w, "Invalid request path", http.StatusBadRequest)
+		return
+	}
 
-func handleObjects(w http.ResponseWriter, r *http.Request) {
+	bucketName := pathParts[0]
+
 	switch r.Method {
 	case http.MethodPut:
-		bucketName := r.URL.Path[len("/buckets/"):]
-		objectName := r.URL.Query().Get("object")
-
-		bucket, err := storage.GetBucket(bucketName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
+		// Gestion de la création de bucket
+		if len(pathParts) == 1 {
+			handleCreateBucket(w, r, bucketName)
+		} else {
+			// Gestion des objets si besoin
+			http.Error(w, "Object operations not supported yet", http.StatusNotImplemented)
 		}
-
-		data, _ := io.ReadAll(r.Body) 
-		err = bucket.PutObject(objectName, data)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusCreated) 
 	case http.MethodGet:
-		bucketName := r.URL.Path[len("/buckets/"):]
-		objectName := r.URL.Query().Get("object")
-
-		bucket, err := storage.GetBucket(bucketName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		object, err := bucket.GetObject(objectName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/xml")
-		xml.NewEncoder(w).Encode(object)
-
-	case http.MethodDelete:
-		bucketName := r.URL.Path[len("/buckets/"):]
-		objectName := r.URL.Query().Get("object")
-
-		bucket, err := storage.GetBucket(bucketName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		err = bucket.DeleteObject(objectName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent) 
+		// Gestion de la liste des buckets
+		handleListBuckets(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// Fonction pour gérer les requêtes de sondage (probes)
+func ProbeHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Probe request received:", r.URL.Path)
+	w.Header().Set("Content-Type", "application/xml")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "<ProbeResult>OK</ProbeResult>")
+}
+
+// Gestion de la création d'un bucket
+func handleCreateBucket(w http.ResponseWriter, r *http.Request, bucketName string) {
+	if bucketName == "" {
+		http.Error(w, "Bucket name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Vérifier si le bucket existe déjà
+	exists, err := storage.BucketExists(bucketName)
+	if err != nil {
+		http.Error(w, "Error checking bucket existence", http.StatusInternalServerError)
+		return
+	}
+	if exists {
+		http.Error(w, "Bucket already exists", http.StatusConflict)
+		return
+	}
+
+	err = storage.CreateBucket(bucketName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK) // Utilisez 200 OK après la création réussie
+}
+
+// Gestion de la liste des buckets
+func handleListBuckets(w http.ResponseWriter, r *http.Request) {
+	buckets, err := storage.ListBuckets()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/xml")
+	xmlData, _ := buckets.ToXML()
+	w.Write(xmlData)
 }

@@ -11,6 +11,10 @@ services:
       - "9000:9000"
       - "9001:9001"
     command: server /data --console-address ":9001"
+    volumes:
+      - ./data:/data  # Montre le volume local pour le stockage persistant
+    networks:
+      - mynetwork
 
   my-s3-clone:
     build:
@@ -18,10 +22,16 @@ services:
       dockerfile: Dockerfile
     container_name: my-s3-clone
     ports:
-      - "8080:8080"
+      - "9090:9090"
     depends_on:
       - minio
     environment:
-      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
+    driver: bridge
