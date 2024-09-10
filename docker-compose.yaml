@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   minio:
-    image: minio/minio
+    image: minio/minio:latest
     container_name: minio
     environment:
       - MINIO_ROOT_USER=minioadmin
@@ -11,8 +11,6 @@ services:
       - "9000:9000"
       - "9001:9001"
     command: server /data --console-address ":9001"
-    volumes:
-      - ./data:/data  # Montre le volume local pour le stockage persistant
     networks:
       - mynetwork
 
@@ -23,6 +21,8 @@ services:
     container_name: my-s3-clone
     ports:
       - "9090:9090"
+    volumes:
+      - ./buckets:/mydata/data 
     depends_on:
       - minio
     environment:
