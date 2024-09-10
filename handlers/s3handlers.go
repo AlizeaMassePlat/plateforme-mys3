@@ -1,6 +1,7 @@
 package handlers
 
 import (
+    "io"
     "my-s3-clone/storage"
     "my-s3-clone/dto"
     "net/http"
@@ -11,6 +12,7 @@ import (
     "fmt"
     "os"
     "strconv"
+    
 
 )
 
@@ -18,7 +20,6 @@ import (
 func HandleListBuckets(w http.ResponseWriter, r *http.Request) {
     log.Printf("Received request: %s %s", r.Method, r.URL.Path)
 
-    // Appel de la fonction ListBuckets depuis le package storage
     log.Println("Calling storage.ListBuckets to get the list of buckets.")
     buckets := storage.ListBuckets()
 
@@ -33,7 +34,7 @@ func HandleListBuckets(w http.ResponseWriter, r *http.Request) {
         log.Printf("Adding bucket: %s", bucketName)
         bucketList = append(bucketList, dto.Bucket{
             Name:         bucketName,
-            CreationDate: time.Now(), // Remplacer par une vraie date de création si disponible
+            CreationDate: time.Now(),
         })
     }
 
@@ -306,4 +307,67 @@ func HandleDeleteBucket(w http.ResponseWriter, r *http.Request) {
 
     w.WriteHeader(http.StatusNoContent)
     log.Printf("Bucket %s successfully deleted", bucketName)
+}
+
+func HandleDeleteObject(w http.ResponseWriter, r *http.Request) {
+    log.Printf("Received DELETE request: %s %s", r.Method, r.URL.Path)
+    vars := mux.Vars(r)
+    bucketName := vars["bucketName"]
+    objectName := vars["objectName"]
+
+    if bucketName == "" || objectName == "" {
+        http.Error(w, "Bucket name and object name are required", http.StatusBadRequest)
+        log.Println("Bucket name or object name is missing")
+        return
+    }
+
+    err := storage.DeleteObject(bucketName, objectName)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        log.Printf("Error deleting object %s in bucket %s: %v", objectName, bucketName, err)
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte("Object successfully deleted"))
+    log.Printf("Object %s in bucket %s successfully deleted", objectName, bucketName)
+}
+
+
+func HandleDeleteBatch(w http.ResponseWriter, r *http.Request) {
+    log.Printf("Received POST ?delete request for batch deletion: %s %s", r.Method, r.URL.Path)
+
+    vars := mux.Vars(r)
+    bucketName := vars["bucketName"]
+    log.Printf("Bucket name: %s", bucketName)
+
+    body, err := io.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, "Error reading request body", http.StatusInternalServerError)
+        log.Printf("Error reading request body: %v", err)
+        return
+    }
+    log.Printf("Request body: %s", string(body))
+
+    var deleteReq dto.DeleteBatchRequest
+    err = xml.Unmarshal(body, &deleteReq)
+    if err != nil {
+        http.Error(w, "Error parsing XML", http.StatusInternalServerError)
+        log.Printf("Error parsing XML: %v", err)
+        return
+    }
+
+    for _, objectToDelete := range deleteReq.Objects {
+        log.Printf("Attempting to delete object: %s", objectToDelete.Key)
+        err := storage.DeleteObject(bucketName, objectToDelete.Key)
+        if err != nil {
+            http.Error(w, "Error deleting object", http.StatusInternalServerError)
+            log.Printf("Error deleting object %s: %v", objectToDelete.Key, err)
+            return
+        }
+        log.Printf("Successfully deleted object: %s", objectToDelete.Key)
+    }
+
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte("Batch delete successful"))
 }

@@ -301,3 +301,21 @@ func DeleteBucket(bucketName string) error {
     log.Printf("Bucket %s successfully deleted", bucketName)
     return nil
 }
+
+func DeleteObject(bucketName, objectName string) error {
+    objectPath := filepath.Join(storageRoot, bucketName, objectName)
+
+    if _, err := os.Stat(objectPath); os.IsNotExist(err) {
+        log.Printf("Object %s does not exist in bucket %s", objectName, bucketName)
+        return err
+    }
+
+    err := os.Remove(objectPath)
+    if err != nil {
+        log.Printf("Failed to delete object %s in bucket %s: %v", objectName, bucketName, err)
+        return err
+    }
+
+    log.Printf("Object %s in bucket %s successfully deleted", objectName, bucketName)
+    return nil
+}
