@@ -49,6 +49,8 @@ func main() {
     r.HandleFunc("/{bucketName}/", handlers.HandleGetBucket).Methods("GET")
     r.HandleFunc("/{bucketName}/", handlers.HandleCreateBucket).Methods("PUT", "GET", "HEAD")
 
+    r.HandleFunc("/{bucketName}/", handlers.HandleDeleteBucket).Methods("DELETE")
+
     log.Println("Serving on :9090")
     log.Fatal(http.ListenAndServe(":9090", r))
 }

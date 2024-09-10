@@ -224,17 +224,6 @@ func CreateBucket(bucketName string) error {
     return nil
 }
 
-// DeleteBucket supprime un bucket (répertoire) ainsi que son contenu
-func DeleteBucket(bucketName string) error {
-    bucketPath := filepath.Join(storageRoot, bucketName)
-    log.Printf("Suppression du bucket : %s", bucketPath)
-    if err := os.RemoveAll(bucketPath); err != nil {
-        log.Printf("Erreur lors de la suppression du bucket: %v", err)
-        return err
-    }
-    return nil
-}
-
 
 
 
@@ -294,5 +283,21 @@ func CheckBucketExists(bucketName string) (bool, error) {
     return true, nil
 }
 
+func DeleteBucket(bucketName string) error {
+    bucketPath := filepath.Join(storageRoot, bucketName)
+    // Vérifiez si le chemin existe
+    if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+        log.Printf("Bucket %s does not exist", bucketName)
+        return err
+    }
 
+    // Suppression du bucket et de son contenu
+    err := os.RemoveAll(bucketPath)
+    if err != nil {
+        log.Printf("Failed to delete bucket %s: %v", bucketName, err)
+        return err
+    }
 
+    log.Printf("Bucket %s successfully deleted", bucketName)
+    return nil
+}

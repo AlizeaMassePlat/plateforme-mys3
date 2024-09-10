@@ -286,6 +286,24 @@ func HandleListObjects(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func HandleDeleteBucket(w http.ResponseWriter, r *http.Request) {
+    log.Printf("Received request: %s %s", r.Method, r.URL.Path)
+    vars := mux.Vars(r)
+    bucketName := vars["bucketName"]
 
+    if bucketName == "" {
+        http.Error(w, "Bucket name is required", http.StatusBadRequest)
+        log.Println("Bucket name is missing")
+        return
+    }
 
+    err := storage.DeleteBucket(bucketName)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        log.Printf("Error while deleting bucket: %v", err)
+        return
+    }
 
+    w.WriteHeader(http.StatusNoContent)
+    log.Printf("Bucket %s successfully deleted", bucketName)
+}
