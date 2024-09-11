@@ -328,10 +328,26 @@ func HandleDeleteObject(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    // Préparer le résultat de la suppression en utilisant dto.DeleteResult
+    deleteResult := dto.DeleteResult{
+        DeletedResult: []dto.Deleted{
+            {Key: objectName},
+        },
+    }
+
+    response, err := xml.Marshal(deleteResult)
+    if err != nil {
+        http.Error(w, "Error generating XML response", http.StatusInternalServerError)
+        log.Printf("Error generating XML response: %v", err)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/xml")
     w.WriteHeader(http.StatusOK)
-    w.Write([]byte("Object successfully deleted"))
+    w.Write(response)
     log.Printf("Object %s in bucket %s successfully deleted", objectName, bucketName)
 }
+
 
 
 func HandleDeleteBatch(w http.ResponseWriter, r *http.Request) {
@@ -357,6 +373,8 @@ func HandleDeleteBatch(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    var deletedObjects []dto.Deleted
+
     for _, objectToDelete := range deleteReq.Objects {
         log.Printf("Attempting to delete object: %s", objectToDelete.Key)
         err := storage.DeleteObject(bucketName, objectToDelete.Key)
@@ -366,8 +384,25 @@ func HandleDeleteBatch(w http.ResponseWriter, r *http.Request) {
             return
         }
         log.Printf("Successfully deleted object: %s", objectToDelete.Key)
+
+        // Ajouter l'objet supprimé au résultat
+        deletedObjects = append(deletedObjects, dto.Deleted{Key: objectToDelete.Key})
     }
 
+    // Préparer la réponse de suppression
+    deleteResult := dto.DeleteResult{
+        DeletedResult: deletedObjects,
+    }
+
+    response, err := xml.Marshal(deleteResult)
+    if err != nil {
+        http.Error(w, "Error generating XML response", http.StatusInternalServerError)
+        log.Printf("Error generating XML response: %v", err)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/xml")
     w.WriteHeader(http.StatusOK)
-    w.Write([]byte("Batch delete successful"))
+    w.Write(response)
+    log.Println("Batch delete successful")
 }

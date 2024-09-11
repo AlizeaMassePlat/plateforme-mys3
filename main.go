@@ -5,6 +5,7 @@ import (
     "net/http"
     "github.com/gorilla/mux"
     "my-s3-clone/handlers"
+    "my-s3-clone/middleware"
     "os"
 )
 
@@ -17,21 +18,10 @@ func init() {
     }
 }
 
-func logRequestMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        log.Printf("Requête reçue 1: %s %s", r.Method, r.RequestURI)
-
-        if len(r.URL.Query()) > 0 {
-            log.Printf("Query Params: %v", r.URL.Query())
-        }
-
-        next.ServeHTTP(w, r)
-    })
-}
-
 func main() {
     r := mux.NewRouter()
-    r.Use(logRequestMiddleware)
+    r.Use(middleware.LogRequestMiddleware)
+    r.Use(middleware.LogResponseMiddleware) 
 
     // Route pour le health check
     r.HandleFunc("/probe-bsign{suffix:.*}", func(w http.ResponseWriter, r *http.Request) {

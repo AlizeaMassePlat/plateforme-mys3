@@ -3,6 +3,8 @@ package middleware
 import (
     "net/http"
     "strings"
+    "log"
+    "bytes"
 )
 
 func BasicAuthMiddleware(next http.Handler) http.Handler {
@@ -26,5 +28,44 @@ func BasicAuthMiddleware(next http.Handler) http.Handler {
         }
 
         next.ServeHTTP(w, r)
+    })
+}
+
+func LogRequestMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        log.Printf("Requête reçue 1: %s %s", r.Method, r.RequestURI)
+
+        if len(r.URL.Query()) > 0 {
+            log.Printf("Query Params: %v", r.URL.Query())
+        }
+
+        next.ServeHTTP(w, r)
+    })
+}
+
+type loggingResponseWriter struct {
+    http.ResponseWriter
+    statusCode int
+    responseBody bytes.Buffer
+}
+
+func (lrw *loggingResponseWriter) WriteHeader(code int) {
+    lrw.statusCode = code
+    lrw.ResponseWriter.WriteHeader(code)
+}
+
+func (lrw *loggingResponseWriter) Write(b []byte) (int, error) {
+    lrw.responseBody.Write(b) // Capture la réponse
+    return lrw.ResponseWriter.Write(b) // Écrit la réponse réelle
+}
+
+func LogResponseMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+        next.ServeHTTP(lrw, r)
+        
+        // Log la réponse
+        log.Printf("Response status: %d", lrw.statusCode)
+        log.Printf("Response body: %s", lrw.responseBody.String())
     })
 }
