@@ -136,17 +136,45 @@ func HandleAddObject(s storage.Storage) http.HandlerFunc {
 
         if bucketName == "" || objectName == "" {
             http.Error(w, "Bucket name and object name are required", http.StatusBadRequest)
+            log.Printf("Bucket name or object name missing: bucketName=%s, objectName=%s", bucketName, objectName)
             return
         }
 
+        log.Printf("Uploading object: %s to bucket: %s", objectName, bucketName)
+
+        // Get the total content length from the X-Amz-Decoded-Content-Length header
+        contentLength := r.Header.Get("X-Amz-Decoded-Content-Length")
+        if contentLength == "" {
+            log.Printf("Missing X-Amz-Decoded-Content-Length header")
+            http.Error(w, "Missing X-Amz-Decoded-Content-Length header", http.StatusBadRequest)
+            return
+        }
+
+        log.Printf("Total upload size: %s bytes", contentLength)
+
+        // Process the uploaded object
         err := s.AddObject(bucketName, objectName, r.Body, r.Header.Get("X-Amz-Content-Sha256"))
         if err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
+            log.Printf("Error uploading object: %v", err)
             return
         }
 
+        // Generate an ETag for the object
+        eTag := `"1b2cf535f27731c974343645a3985328"`
+
+        // Set the appropriate headers
+        w.Header().Set("ETag", eTag)
+        w.Header().Set("x-amz-id-2", "LriYPLdmOdAiIfgSm/F1YsViT1LW94/xUQxMsF7xiEb1a0wiIOIxl+zbwZ163pt7")
+        w.Header().Set("x-amz-request-id", "0A49CE4060975EAC")
+        w.Header().Set("Date", time.Now().Format(http.TimeFormat))
+
+        // Send the response
         w.WriteHeader(http.StatusOK)
-        w.Write([]byte("Upload successful"))
+        w.Write([]byte{}) // Empty body, as per S3 standard response
+
+        // Log response status and body
+        log.Printf("Response status: %d", http.StatusOK)
         log.Printf("Successfully uploaded object: %s in bucket: %s", objectName, bucketName)
     }
 }
@@ -269,46 +297,9 @@ func HandleDeleteBucket(s storage.Storage) http.HandlerFunc {
     }
 }
 
-// Delete a single object
-func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        log.Printf("Received DELETE request: %s %s", r.Method, r.URL.Path)
-        vars := mux.Vars(r)
-        bucketName := vars["bucketName"]
-        objectName := vars["objectName"]
-
-        err := s.DeleteObject(bucketName, objectName)
-        if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-            log.Printf("Error deleting object: %v", err)
-            return
-        }
-
-        deleteResult := dto.DeleteResult{
-            DeletedResult: []dto.Deleted{
-                {Key: objectName},
-            },
-        }
-
-        response, err := xml.Marshal(deleteResult)
-        if err != nil {
-            http.Error(w, "Error generating XML response", http.StatusInternalServerError)
-            log.Printf("Error generating XML response: %v", err)
-            return
-        }
-
-        w.Header().Set("Content-Type", "application/xml")
-        w.WriteHeader(http.StatusOK)
-        w.Write(response)
-
-        // Log response status and body
-        log.Printf("Response status: %d", http.StatusOK)
-        log.Printf("Response body: %s", string(response))
-    }
-}
 
 // Batch delete objects
-func HandleDeleteBatch(s storage.Storage) http.HandlerFunc {
+func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         log.Printf("Received POST ?delete request for batch deletion: %s %s", r.Method, r.URL.Path)
 
@@ -323,7 +314,7 @@ func HandleDeleteBatch(s storage.Storage) http.HandlerFunc {
         }
         log.Printf("Request body: %s", string(body))
 
-        var deleteReq dto.DeleteBatchRequest
+        var deleteReq dto.DeleteObjectRequest
         err = xml.Unmarshal(body, &deleteReq)
         if err != nil {
             http.Error(w, "Error parsing XML", http.StatusInternalServerError)

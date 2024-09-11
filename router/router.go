@@ -28,10 +28,9 @@ func SetupRouterWithStorage(s storage.Storage) *mux.Router {
     }).Methods("GET", "HEAD")
 
     // Batch delete route
-    r.HandleFunc("/{bucketName}/", handlers.HandleDeleteBatch(s)).Queries("delete", "").Methods("POST")
+    r.HandleFunc("/{bucketName}/", handlers.HandleDeleteObject(s)).Queries("delete", "").Methods("POST")
 
     // Object-specific routes
-    r.HandleFunc("/{bucketName}/{objectName}", handlers.HandleDeleteObject(s)).Methods("DELETE")
     r.HandleFunc("/{bucketName}/{objectName}", handlers.HandleAddObject(s)).Methods("POST", "PUT")
     r.HandleFunc("/{bucketName}/{objectName}", handlers.HandleCheckObjectExist(s)).Methods("HEAD")
     r.HandleFunc("/{bucketName}/{objectName}", handlers.HandleDownloadObject(s)).Methods("GET")
@@ -39,7 +38,7 @@ func SetupRouterWithStorage(s storage.Storage) *mux.Router {
     // Bucket-specific routes
     r.HandleFunc("/{bucketName}/", handlers.HandleListObjects(s)).Methods("GET", "HEAD")
     r.HandleFunc("/{bucketName}/", handlers.HandleGetBucket(s)).Methods("GET")
-    r.HandleFunc("/{bucketName}/", handlers.HandleCreateBucket(s)).Methods("PUT", "GET", "HEAD")
+    r.HandleFunc("/{bucketName}/", handlers.HandleCreateBucket(s)).Methods("PUT")
     r.HandleFunc("/{bucketName}/", handlers.HandleDeleteBucket(s)).Methods("DELETE")
 
     // Route for listing all buckets

@@ -3,12 +3,12 @@ package dto
 import (
     "encoding/xml"
 )
-type DeleteObjectRequest struct {
-	Quiet  bool `xml:"Quiet"`
-	Object struct {
-		Key string `xml:"Key"`
-	} `xml:"Object"`
-}
+// type DeleteObjectRequest struct {
+// 	Quiet  bool `xml:"Quiet"`
+// 	Object struct {
+// 		Key string `xml:"Key"`
+// 	} `xml:"Object"`
+// }
 
 type DeleteResult struct {
 	DeletedResult []Deleted `xml:"Deleted"`
@@ -18,8 +18,8 @@ type Deleted struct {
 	Key string `xml:"Key"`
 }
 
-// DeleteBatchRequest représente la requête de suppression d'objets en batch
-type DeleteBatchRequest struct {
+// DeleteObjectRequest représente la requête de suppression d'objets en batch
+type DeleteObjectRequest struct {
     XMLName xml.Name         `xml:"Delete"`
     Objects []ObjectToDelete  `xml:"Object"`
 }

@@ -5,27 +5,94 @@ import (
 	"encoding/xml"
 	"net/http"
 	"net/http/httptest"
-	"os"       
+	"os"
 	"testing"
-	"github.com/gorilla/mux" 
-	"my-s3-clone/handlers"   
+	"github.com/gorilla/mux"
+	"my-s3-clone/handlers"
 	"my-s3-clone/router"
 	"my-s3-clone/dto"
 	"my-s3-clone/storage"
+	"io"
+	"time"
+	"fmt"
 )
 
 // MockStorage is a mock implementation of the Storage interface
 type MockStorage struct {
-	storage.Storage
-	DeleteObjectFunc func(bucketName, objectKey string) error
+	AddObjectFunc         func(bucketName, objectName string, data io.Reader, contentSha256 string) error
+	DeleteObjectFunc      func(bucketName, objectName string) error
+	CheckBucketExistsFunc func(bucketName string) (bool, error)
+	CheckObjectExistFunc  func(bucketName, objectName string) (bool, time.Time, int64, error)
+	DeleteBucketFunc      func(bucketName string) error
+	GetObjectFunc         func(bucketName, objectName string) ([]byte, storage.FileInfo, error)
+	ListBucketsFunc       func() []string
+	ListObjectsFunc       func(bucketName, prefix, marker string, maxKeys int) (dto.ListObjectsResponse, error)
+	CreateBucketFunc      func(bucketName string) error
 }
 
-// Mock implementation of the DeleteObject method
-func (m *MockStorage) DeleteObject(bucketName, objectKey string) error {
-	if m.DeleteObjectFunc != nil {
-		return m.DeleteObjectFunc(bucketName, objectKey)
+// Implementations of the Storage interface using the mock functions
+func (m *MockStorage) AddObject(bucketName, objectName string, data io.Reader, contentSha256 string) error {
+	if m.AddObjectFunc != nil {
+		return m.AddObjectFunc(bucketName, objectName, data, contentSha256)
 	}
 	return nil
+}
+
+func (m *MockStorage) DeleteObject(bucketName, objectName string) error {
+	if m.DeleteObjectFunc != nil {
+		return m.DeleteObjectFunc(bucketName, objectName)
+	}
+	return nil
+}
+
+func (m *MockStorage) CheckBucketExists(bucketName string) (bool, error) {
+	if m.CheckBucketExistsFunc != nil {
+		return m.CheckBucketExistsFunc(bucketName)
+	}
+	return false, nil
+}
+
+func (m *MockStorage) CheckObjectExist(bucketName, objectName string) (bool, time.Time, int64, error) {
+	if m.CheckObjectExistFunc != nil {
+		return m.CheckObjectExistFunc(bucketName, objectName)
+	}
+	return false, time.Time{}, 0, nil
+}
+
+func (m *MockStorage) DeleteBucket(bucketName string) error {
+	if m.DeleteBucketFunc != nil {
+		return m.DeleteBucketFunc(bucketName)
+	}
+	return nil
+}
+
+func (m *MockStorage) GetObject(bucketName, objectName string) ([]byte, storage.FileInfo, error) {
+	if m.GetObjectFunc != nil {
+		return m.GetObjectFunc(bucketName, objectName)
+	}
+	return nil, nil, os.ErrNotExist
+}
+
+func (m *MockStorage) ListBuckets() []string {
+	if m.ListBucketsFunc != nil {
+		return m.ListBucketsFunc()
+	}
+	return []string{}
+}
+
+func (m *MockStorage) ListObjects(bucketName, prefix, marker string, maxKeys int) (dto.ListObjectsResponse, error) {
+	if m.ListObjectsFunc != nil {
+		return m.ListObjectsFunc(bucketName, prefix, marker, maxKeys)
+	}
+	return dto.ListObjectsResponse{}, nil
+}
+
+// Mock implementation of CreateBucket
+func (m *MockStorage) CreateBucket(bucketName string) error {
+    if m.CreateBucketFunc != nil {
+        return m.CreateBucketFunc(bucketName)
+    }
+    return nil
 }
 
 // Test for the /probe-bsign{suffix:.*} route
@@ -62,7 +129,7 @@ func TestProbeBSignRoute(t *testing.T) {
 }
 
 // Test for the /{bucketName}/?delete= (POST batch delete)
-func TestHandleDeleteBatch(t *testing.T) {
+func TestHandleDeleteObject(t *testing.T) {
 	// Mock storage
 	mockStorage := &MockStorage{}
 
@@ -70,7 +137,7 @@ func TestHandleDeleteBatch(t *testing.T) {
 	r := router.SetupRouterWithStorage(mockStorage) // Assuming you have a way to inject storage into the router
 
 	// Create a DeleteBatchRequest with objects to delete
-	deleteReq := dto.DeleteBatchRequest{
+	deleteReq := dto.DeleteObjectRequest{
 		Objects: []dto.ObjectToDelete{
 			{Key: "object1.txt"},
 			{Key: "object2.txt"},
@@ -121,27 +188,50 @@ func TestHandleDeleteBatch(t *testing.T) {
 	}
 }
 
-// Test for deleting a single object
-func TestHandleDeleteObject(t *testing.T) {
+// Test for the /{bucketName}/{objectName} (POST/PUT) route
+func TestHandleAddObject(t *testing.T) {
 	// Create a new instance of the mock storage
 	mockStorage := &MockStorage{
-		DeleteObjectFunc: func(bucketName, objectName string) error {
+		AddObjectFunc: func(bucketName, objectName string, data io.Reader, contentSha256 string) error {
 			if bucketName == "test-bucket" && objectName == "test-object" {
-				return nil 
+				// Simulate successful upload, reading the content from the reader
+				buf := new(bytes.Buffer)
+				if _, err := buf.ReadFrom(data); err != nil {
+					return err
+				}
+				if buf.String() != "file content" {
+					return fmt.Errorf("unexpected file content: %s", buf.String())
+				}
+				return nil
 			}
-			return os.ErrNotExist 
+			return os.ErrNotExist // Simulate failure
+		},
+		CheckBucketExistsFunc: func(bucketName string) (bool, error) {
+			if bucketName == "test-bucket" {
+				return true, nil
+			}
+			return false, nil
+		},
+		CheckObjectExistFunc: func(bucketName, objectName string) (bool, time.Time, int64, error) {
+			if bucketName == "test-bucket" && objectName == "test-object" {
+				return true, time.Now(), 1234, nil
+			}
+			return false, time.Time{}, 0, os.ErrNotExist
 		},
 	}
 
 	// Initialize the router with the mock storage
 	r := mux.NewRouter()
-	r.HandleFunc("/{bucketName}/{objectName}", handlers.HandleDeleteObject(mockStorage)).Methods("DELETE")
+	r.HandleFunc("/{bucketName}/{objectName}", handlers.HandleAddObject(mockStorage)).Methods("POST", "PUT")
 
-	// Create a DELETE request for the object
-	req, err := http.NewRequest("DELETE", "/test-bucket/test-object", nil)
+	// Create a POST request to upload an object
+	req, err := http.NewRequest("POST", "/test-bucket/test-object", bytes.NewBuffer([]byte("file content")))
 	if err != nil {
 		t.Fatalf("could not create request: %v", err)
 	}
+	req.Header.Set("X-Amz-Content-Sha256", "dummyhash")
+	req.Header.Set("Expect", "100-continue") // Add the Expect header
+	req.Header.Set("X-Amz-Decoded-Content-Length", "12") // Add the missing header
 
 	// Create a response recorder to capture the response
 	rr := httptest.NewRecorder()
@@ -149,21 +239,89 @@ func TestHandleDeleteObject(t *testing.T) {
 	// Serve the request using the router
 	r.ServeHTTP(rr, req)
 
+	// Check for the 100 Continue response if Expect: 100-continue is set
+	if rr.Result().StatusCode == http.StatusContinue {
+		rr = httptest.NewRecorder() // Reset response recorder for actual processing
+		r.ServeHTTP(rr, req)        // Process the actual request after 100 Continue
+	}
+
 	// Check the status code
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected status %d but got %d", http.StatusOK, rr.Code)
 	}
 
 	// Check the response body
-	var deleteResult dto.DeleteResult
-	err = xml.Unmarshal(rr.Body.Bytes(), &deleteResult)
-	if err != nil {
-		t.Fatalf("Error unmarshaling response body: %v", err)
+	expectedResponse := ""
+	if rr.Body.String() != expectedResponse {
+		t.Errorf("expected body %q but got %q", expectedResponse, rr.Body.String())
 	}
 
-	// Validate that the deleted object key matches the request
-	expectedKey := "test-object"
-	if len(deleteResult.DeletedResult) != 1 || deleteResult.DeletedResult[0].Key != expectedKey {
-		t.Errorf("expected deleted object %s, got %v", expectedKey, deleteResult.DeletedResult)
+	// Validate the response headers
+	if rr.Header().Get("ETag") == "" {
+		t.Errorf("expected ETag header to be set")
+	}
+	if rr.Header().Get("x-amz-id-2") == "" {
+		t.Errorf("expected x-amz-id-2 header to be set")
+	}
+	if rr.Header().Get("x-amz-request-id") == "" {
+		t.Errorf("expected x-amz-request-id header to be set")
+	}
+}
+
+func TestHandleCheckObjectExist(t *testing.T) {
+	// Create a new instance of the mock storage
+	mockStorage := &MockStorage{
+		CheckObjectExistFunc: func(bucketName, objectName string) (bool, time.Time, int64, error) {
+			// Simulate that the object exists
+			if bucketName == "test-bucket" && objectName == "test-object" {
+				return true, time.Now(), 1234, nil
+			}
+			// Simulate that the object does not exist
+			return false, time.Time{}, 0, nil
+		},
+	}
+
+	// Initialize the router with the mock storage
+	r := mux.NewRouter()
+	r.HandleFunc("/{bucketName}/{objectName}", handlers.HandleCheckObjectExist(mockStorage)).Methods("HEAD")
+
+	// Create test cases
+	tests := []struct {
+		bucketName   string
+		objectName   string
+		expectedCode int
+	}{
+		{"test-bucket", "test-object", http.StatusOK},       
+		{"test-bucket", "nonexistent-object", http.StatusNotFound}, 
+	}
+
+	for _, tt := range tests {
+		// Create a new HEAD request for the object
+		req, err := http.NewRequest("HEAD", "/"+tt.bucketName+"/"+tt.objectName, nil)
+		if err != nil {
+			t.Fatalf("could not create request: %v", err)
+		}
+
+		// Create a response recorder to capture the response
+		rr := httptest.NewRecorder()
+
+		// Serve the request using the router
+		r.ServeHTTP(rr, req)
+
+		// Check the status code
+		if rr.Code != tt.expectedCode {
+			t.Errorf("expected status %d but got %d for object: %s", tt.expectedCode, rr.Code, tt.objectName)
+		}
+
+		// Additional checks if the object exists
+		if tt.expectedCode == http.StatusOK {
+			// Check for the Last-Modified and Content-Length headers
+			if rr.Header().Get("Last-Modified") == "" {
+				t.Errorf("expected Last-Modified header to be set for object: %s", tt.objectName)
+			}
+			if rr.Header().Get("Content-Length") != "1234" {
+				t.Errorf("expected Content-Length to be 1234 but got %s", rr.Header().Get("Content-Length"))
+			}
+		}
 	}
 }

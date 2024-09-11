@@ -21,8 +21,11 @@ const storageRoot = "/mydata/data"
 func ProcessChunkedStream(reader io.Reader, writer io.Writer) error {
     bufReader := bufio.NewReader(reader)
     log.Println("Started processing chunked stream")
-    
+
+    totalBytesProcessed := int64(0)
+
     for {
+        // Read chunk size line
         line, err := bufReader.ReadString('\n')
         if err != nil {
             log.Printf("Error reading chunk size: %v", err)
@@ -30,6 +33,7 @@ func ProcessChunkedStream(reader io.Reader, writer io.Writer) error {
         }
         log.Printf("Received chunk size line: %s", line)
 
+        // Parse chunk size (ignore chunk extensions)
         line = strings.TrimSpace(line)
         parts := strings.SplitN(line, ";", 2)
         chunkSizeHex := parts[0]
@@ -42,49 +46,62 @@ func ProcessChunkedStream(reader io.Reader, writer io.Writer) error {
 
         log.Printf("Parsed chunk size: %d", chunkSize)
 
+        // End of stream (zero-size chunk)
         if chunkSize == 0 {
             log.Println("Received final chunk (size 0), finishing")
             break
         }
 
+        // Copy chunk data to writer
         if _, err := io.CopyN(writer, bufReader, chunkSize); err != nil {
             log.Printf("Error reading chunk data: %v", err)
             return fmt.Errorf("error reading chunk data: %v", err)
         }
 
+        totalBytesProcessed += chunkSize
+        log.Printf("Successfully processed a chunk, total bytes processed: %d", totalBytesProcessed)
+
+        // Discard the CRLF after the chunk
         if _, err := bufReader.Discard(2); err != nil {
             log.Printf("Error discarding CRLF: %v", err)
             return fmt.Errorf("error discarding CRLF: %v", err)
         }
 
-        log.Println("Successfully processed a chunk")
-
+        // Log chunk signature (optional)
         if len(parts) > 1 {
             chunkSignature := parts[1]
             log.Printf("Chunk signature: %s", chunkSignature)
         }
     }
 
-    log.Println("Completed processing chunked stream")
+    log.Printf("Completed processing chunked stream, total bytes processed: %d", totalBytesProcessed)
     return nil
 }
 
+
 // Ajout d'un objet dans un bucket
 func (fs *FileStorage) AddObject(bucketName, objectName string, data io.Reader, contentSha256 string) error {
+    log.Printf("Starting object upload: %s in bucket: %s", objectName, bucketName)
+
     objectPath, err := getUniqueObjectPath(bucketName, objectName)
     if err != nil {
-        log.Printf("Failed to create object path: %v", err)
+        log.Printf("Failed to create object path for %s in bucket %s: %v", objectName, bucketName, err)
         return fmt.Errorf("Failed to create object path: %v", err)
     }
 
+    log.Printf("Object path created: %s", objectPath)
+
     file, err := os.Create(objectPath)
     if err != nil {
-        log.Printf("Failed to create file: %v", err)
+        log.Printf("Failed to create file: %s, error: %v", objectPath, err)
         return fmt.Errorf("Failed to create file: %v", err)
     }
     defer file.Close()
 
+    log.Printf("Writing data to object: %s", objectPath)
+
     if err := writeObjectToFile(data, file, contentSha256); err != nil {
+        log.Printf("Error writing object to file: %v", err)
         return err
     }
 
