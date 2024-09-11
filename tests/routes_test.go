@@ -17,6 +17,20 @@ import (
 	"fmt"
 )
 
+// Mock implementation of FileInfo 
+type MockFileInfo struct {
+	name    string
+	size    int64
+	modTime time.Time
+}
+
+func (m MockFileInfo) Name() string       { return m.name }
+func (m MockFileInfo) Size() int64        { return m.size }
+func (m MockFileInfo) Mode() os.FileMode  { return 0644 }
+func (m MockFileInfo) ModTime() time.Time { return m.modTime }
+func (m MockFileInfo) IsDir() bool        { return false }
+func (m MockFileInfo) Sys() interface{}   { return nil }
+
 // MockStorage is a mock implementation of the Storage interface
 type MockStorage struct {
 	AddObjectFunc         func(bucketName, objectName string, data io.Reader, contentSha256 string) error
@@ -324,4 +338,99 @@ func TestHandleCheckObjectExist(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestHandleListObjects(t *testing.T) {
+    // Create a new instance of the mock storage
+    mockStorage := &MockStorage{
+        ListObjectsFunc: func(bucketName, prefix, marker string, maxKeys int) (dto.ListObjectsResponse, error) {
+            // Simulate a response with some objects
+            if marker == "object1.txt" {
+                // Simulate paginated response
+                return dto.ListObjectsResponse{
+                    Name:    bucketName,
+                    Prefix:  prefix,
+                    Marker:  marker,
+                    MaxKeys: maxKeys,
+                    Contents: []dto.Object{
+                        {Key: "object2.txt", LastModified: time.Now(), Size: 5678},
+                    },
+                    IsTruncated: false,
+                }, nil
+            }
+
+            return dto.ListObjectsResponse{
+                Name:    bucketName,
+                Prefix:  prefix,
+                Marker:  marker,
+                MaxKeys: maxKeys,
+                Contents: []dto.Object{
+                    {Key: "object1.txt", LastModified: time.Now(), Size: 1234},
+                    {Key: "object2.txt", LastModified: time.Now(), Size: 5678},
+                },
+                IsTruncated: false,
+            }, nil
+        },
+    }
+
+    // Initialize the router with the mock storage
+    r := mux.NewRouter()
+    r.HandleFunc("/{bucketName}/", handlers.HandleListObjects(mockStorage)).Methods("GET", "HEAD")
+
+    // Create test cases
+    tests := []struct {
+        bucketName   string
+        queryParams  string
+        expectedCode int
+        expectedKeys []string
+    }{
+        {
+            "test-bucket", "prefix=&marker=&max-keys=2", http.StatusOK,
+            []string{"object1.txt", "object2.txt"},
+        },
+        {
+            "test-bucket", "prefix=&marker=object1.txt&max-keys=1", http.StatusOK,
+            []string{"object2.txt"},
+        },
+    }
+
+    for _, tt := range tests {
+        // Create a GET request for listing objects in the bucket
+        req, err := http.NewRequest("GET", "/"+tt.bucketName+"/?"+tt.queryParams, nil)
+        if err != nil {
+            t.Fatalf("could not create request: %v", err)
+        }
+
+        // Create a response recorder to capture the response
+        rr := httptest.NewRecorder()
+
+        // Serve the request using the router
+        r.ServeHTTP(rr, req)
+
+        // Check the status code
+        if rr.Code != tt.expectedCode {
+            t.Errorf("expected status %d but got %d for bucket: %s", tt.expectedCode, rr.Code, tt.bucketName)
+        }
+
+        // Check the response content if the request was successful
+        if tt.expectedCode == http.StatusOK {
+            var listObjectsResponse dto.ListObjectsResponse
+            err := xml.Unmarshal(rr.Body.Bytes(), &listObjectsResponse)
+            if err != nil {
+                t.Fatalf("Error unmarshaling response body: %v", err)
+            }
+
+            // Check the number of returned objects
+            if len(listObjectsResponse.Contents) != len(tt.expectedKeys) {
+                t.Errorf("expected %d objects but got %d", len(tt.expectedKeys), len(listObjectsResponse.Contents))
+            }
+
+            // Check that the object keys match the expected keys
+            for i, obj := range listObjectsResponse.Contents {
+                if obj.Key != tt.expectedKeys[i] {
+                    t.Errorf("expected object key %s but got %s", tt.expectedKeys[i], obj.Key)
+                }
+            }
+        }
+    }
 }
