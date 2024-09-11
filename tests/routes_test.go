@@ -490,3 +490,64 @@ func TestHandleGetBucket(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleCreateBucket(t *testing.T) {
+	// Mock storage
+	mockStorage := &MockStorage{
+		CreateBucketFunc: func(bucketName string) error {
+			if bucketName == "test-bucket" {
+				// Simulate successful bucket creation
+				return nil
+			}
+			// Simulate an error if the bucket creation fails
+			return fmt.Errorf("failed to create bucket")
+		},
+	}
+
+	// Initialize the router with the mock storage
+	r := mux.NewRouter()
+	r.HandleFunc("/{bucketName}/", handlers.HandleCreateBucket(mockStorage)).Methods("PUT")
+
+	tests := []struct {
+		bucketName   string
+		expectedCode int
+		expectedBody string
+	}{
+		{"test-bucket", http.StatusOK, ""},         
+		{"fail-bucket", http.StatusInternalServerError, "failed to create bucket\n"}, 
+	}
+
+	for _, tt := range tests {
+		// Create a PUT request to create a bucket
+		req, err := http.NewRequest("PUT", "/"+tt.bucketName+"/", nil)
+		if err != nil {
+			t.Fatalf("could not create request: %v", err)
+		}
+
+		// Create a response recorder to capture the response
+		rr := httptest.NewRecorder()
+
+		// Serve the request using the router
+		r.ServeHTTP(rr, req)
+
+		// Check the status code
+		if rr.Code != tt.expectedCode {
+			t.Errorf("expected status %d but got %d for bucket: %s", tt.expectedCode, rr.Code, tt.bucketName)
+		}
+
+		// Check the response body
+		if tt.expectedCode == http.StatusOK {
+			var response dto.ListAllMyBucketsResult
+			err := xml.Unmarshal(rr.Body.Bytes(), &response)
+			if err != nil {
+				t.Fatalf("Error unmarshaling response body: %v", err)
+			}
+
+			if response.Buckets[0].Name != tt.bucketName {
+				t.Errorf("expected bucket name %q but got %q", tt.bucketName, response.Buckets[0].Name)
+			}
+		} else if rr.Body.String() != tt.expectedBody {
+			t.Errorf("expected body %q but got %q", tt.expectedBody, rr.Body.String())
+		}
+	}
+}
