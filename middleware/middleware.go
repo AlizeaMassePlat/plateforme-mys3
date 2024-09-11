@@ -55,8 +55,8 @@ func (lrw *loggingResponseWriter) WriteHeader(code int) {
 }
 
 func (lrw *loggingResponseWriter) Write(b []byte) (int, error) {
-    lrw.responseBody.Write(b) // Capture la réponse
-    return lrw.ResponseWriter.Write(b) // Écrit la réponse réelle
+    lrw.responseBody.Write(b) 
+    return lrw.ResponseWriter.Write(b) 
 }
 
 func LogResponseMiddleware(next http.Handler) http.Handler {

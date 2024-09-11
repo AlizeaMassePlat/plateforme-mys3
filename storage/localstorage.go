@@ -13,6 +13,9 @@ import (
     "my-s3-clone/dto"
 )
 
+// FileStorage implémente l'interface Storage avec un stockage basé sur le système de fichiers
+type FileStorage struct{}
+
 const storageRoot = "/mydata/data"
 
 func ProcessChunkedStream(reader io.Reader, writer io.Writer) error {
@@ -66,7 +69,8 @@ func ProcessChunkedStream(reader io.Reader, writer io.Writer) error {
     return nil
 }
 
-func AddObject(bucketName, objectName string, data io.Reader, contentSha256 string) error {
+// Ajout d'un objet dans un bucket
+func (fs *FileStorage) AddObject(bucketName, objectName string, data io.Reader, contentSha256 string) error {
     objectPath, err := getUniqueObjectPath(bucketName, objectName)
     if err != nil {
         log.Printf("Failed to create object path: %v", err)
@@ -80,7 +84,6 @@ func AddObject(bucketName, objectName string, data io.Reader, contentSha256 stri
     }
     defer file.Close()
 
-    // Appel à une fonction qui gère l'écriture du flux de données dans le fichier
     if err := writeObjectToFile(data, file, contentSha256); err != nil {
         return err
     }
@@ -131,13 +134,12 @@ func writeObjectToFile(data io.Reader, file *os.File, contentSha256 string) erro
     return nil
 }
 
-func ListObjects(bucketName, prefix, marker string, maxKeys int) (dto.ListObjectsResponse, error) {
+// Lister les objets dans un bucket
+func (fs *FileStorage) ListObjects(bucketName, prefix, marker string, maxKeys int) (dto.ListObjectsResponse, error) {
     bucketPath := filepath.Join(storageRoot, bucketName)
 
-    // Récupérer tous les fichiers correspondant au préfixe donné
     objects, err := filepath.Glob(filepath.Join(bucketPath, prefix+"*"))
     if err != nil {
-        log.Printf("Error while listing objects in bucket %s: %v", bucketName, err)
         return dto.ListObjectsResponse{}, fmt.Errorf("error while listing objects: %v", err)
     }
 
@@ -159,11 +161,9 @@ func ListObjects(bucketName, prefix, marker string, maxKeys int) (dto.ListObject
 
         fileInfo, err := os.Stat(object)
         if err != nil {
-            log.Printf("Error retrieving file info for object %s: %v", object, err)
             return dto.ListObjectsResponse{}, fmt.Errorf("error retrieving file info: %v", err)
         }
 
-        // Ajouter l'objet à la réponse
         response.Contents = append(response.Contents, dto.Object{
             Key:          filepath.Base(object),
             LastModified: fileInfo.ModTime(),
@@ -171,127 +171,93 @@ func ListObjects(bucketName, prefix, marker string, maxKeys int) (dto.ListObject
         })
     }
 
-    log.Printf("Successfully listed objects for bucket %s", bucketName)
     return response, nil
 }
 
-
-func ListBuckets() []string {
-    log.Println("Attempting to list buckets in storage.")
-
+// Lister les buckets
+func (fs *FileStorage) ListBuckets() []string {
     var buckets []string
-
-    // Lire le répertoire "buckets" pour récupérer les sous-répertoires (les buckets)
     files, err := os.ReadDir(storageRoot)
     if err != nil {
-        log.Printf("Erreur lors de la lecture du répertoire 'buckets': %v", err)
         return buckets
     }
 
-    log.Printf("Found %d items in the directory.", len(files))
-
     for _, file := range files {
         if file.IsDir() {
-            log.Printf("Found bucket: %s", file.Name())
             buckets = append(buckets, file.Name())
-        } else {
-            log.Printf("Skipping non-directory item: %s", file.Name())
         }
-    }
-
-    if len(buckets) == 0 {
-        log.Println("No buckets found after scanning the directory.")
-    } else {
-        log.Printf("Successfully listed %d buckets.", len(buckets))
     }
 
     return buckets
 }
 
-
-
-
-
-
-// CreateBucket crée un nouveau bucket (répertoire) dans storageRoot
-func CreateBucket(bucketName string) error {
+// Créer un bucket
+func (fs *FileStorage) CreateBucket(bucketName string) error {
     bucketPath := filepath.Join(storageRoot, bucketName)
-    log.Printf("Création du bucket : %s", bucketPath)
     if err := os.MkdirAll(bucketPath, os.ModePerm); err != nil {
-        log.Printf("Erreur lors de la création du bucket: %v", err)
         return err
     }
     return nil
 }
 
+// Récupération d'un objet dans un bucket
+func (fs *FileStorage) GetObject(bucketName, objectName string) ([]byte, FileInfo, error) {
+	objectPath := filepath.Join(storageRoot, bucketName, objectName)
+	log.Printf("Tentative de récupération de l'objet : %s", objectPath)
 
-
-
-func GetObject(bucketName, objectName string) ([]byte, os.FileInfo, error) {
-    objectPath := filepath.Join(storageRoot, bucketName, objectName)
-    log.Printf("Tentative de récupération de l'objet : %s", objectPath)
-
-    // Lire le fichier
-    data, err := os.ReadFile(objectPath)
-    if err != nil {
+	// Lire le fichier
+	data, err := os.ReadFile(objectPath)
+	if err != nil {
 		log.Printf("Erreur lors de la lecture de l'objet: %v", err)
-        return nil, nil, err
-    }
+		return nil, nil, err
+	}
 
-    // Récupérer les métadonnées du fichier
-    fileInfo, err := os.Stat(objectPath)
-    if err != nil {
-        log.Printf("Erreur lors de la récupération des métadonnées du fichier: %v", err)
-        return nil, nil, err
-    }
+	// Récupérer les métadonnées du fichier
+	fileInfo, err := os.Stat(objectPath)
+	if err != nil {
+		log.Printf("Erreur lors de la récupération des métadonnées du fichier: %v", err)
+		return nil, nil, err
+	}
 
-    log.Printf("Objet récupéré avec succès: %s", objectPath)
-    return data, fileInfo, nil
+	// Retourner le contenu du fichier et les métadonnées encapsulées dans fileInfoWrapper
+	return data, &fileInfoWrapper{fileInfo: fileInfo}, nil
 }
 
-
-
-func CheckObjectExist(bucketName, objectName string) (bool, time.Time, int64, error) {
+// Vérification de l'existence d'un objet dans un bucket
+func (fs *FileStorage) CheckObjectExist(bucketName, objectName string) (bool, time.Time, int64, error) {
     objectPath := filepath.Join(storageRoot, bucketName, objectName)
-    
+
     fileInfo, err := os.Stat(objectPath)
     if os.IsNotExist(err) {
-        log.Printf("Object not found: %s", objectPath)
         return false, time.Time{}, 0, nil
     } else if err != nil {
         log.Printf("Error checking object: %v", err)
         return false, time.Time{}, 0, fmt.Errorf("error checking object existence: %v", err)
     }
 
-    log.Printf("Object found: %s", objectPath)
     return true, fileInfo.ModTime(), fileInfo.Size(), nil
 }
 
-
-
-func CheckBucketExists(bucketName string) (bool, error) {
+// Vérification de l'existence d'un bucket
+func (fs *FileStorage) CheckBucketExists(bucketName string) (bool, error) {
     bucketPath := filepath.Join(storageRoot, bucketName)
-    log.Printf("Vérification de l'existence du bucket : %s", bucketPath)
-
     if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
-		return false, nil
-		} else if err != nil {
-			log.Printf("Erreur lors de la vérification du bucket: %v", err)
+        return false, nil
+    } else if err != nil {
         return false, err
     }
-	
     return true, nil
 }
 
-func DeleteBucket(bucketName string) error {
+// Suppression d'un bucket
+func (fs *FileStorage) DeleteBucket(bucketName string) error {
     bucketPath := filepath.Join(storageRoot, bucketName)
-    // Vérifiez si le chemin existe
+
     if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
         log.Printf("Bucket %s does not exist", bucketName)
         return err
     }
 
-    // Suppression du bucket et de son contenu
     err := os.RemoveAll(bucketPath)
     if err != nil {
         log.Printf("Failed to delete bucket %s: %v", bucketName, err)
@@ -302,7 +268,8 @@ func DeleteBucket(bucketName string) error {
     return nil
 }
 
-func DeleteObject(bucketName, objectName string) error {
+// Suppression d'un objet dans un bucket
+func (fs *FileStorage) DeleteObject(bucketName, objectName string) error {
     objectPath := filepath.Join(storageRoot, bucketName, objectName)
 
     if _, err := os.Stat(objectPath); os.IsNotExist(err) {
