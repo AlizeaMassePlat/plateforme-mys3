@@ -551,3 +551,64 @@ func TestHandleCreateBucket(t *testing.T) {
 		}
 	}
 }
+
+// TestHandleDeleteBucket tests the deletion of a bucket
+func TestHandleDeleteBucket(t *testing.T) {
+	// Set up the mock storage with DeleteBucket behavior
+	mockStorage := &MockStorage{
+		DeleteBucketFunc: func(bucketName string) error {
+			// Simulate failure for a specific bucket
+			if bucketName == "fail-bucket" {
+				return fmt.Errorf("failed to delete bucket")
+			}
+			return nil
+		},
+	}
+
+	// Initialize the router with the handler and the mock storage
+	r := mux.NewRouter()
+	r.HandleFunc("/{bucketName}/", handlers.HandleDeleteBucket(mockStorage)).Methods("DELETE")
+
+	// Test cases
+	tests := []struct {
+		bucketName    string
+		expectedCode  int
+		expectedBody  string
+	}{
+		{
+			bucketName:   "test-bucket",
+			expectedCode: http.StatusNoContent,
+			expectedBody: "",
+		},
+		{
+			bucketName:   "fail-bucket",
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: "failed to delete bucket\n",
+		},
+	}
+
+	// Run through test cases
+	for _, tt := range tests {
+		// Create a DELETE request for the bucket
+		req, err := http.NewRequest("DELETE", "/"+tt.bucketName+"/", nil)
+		if err != nil {
+			t.Fatalf("could not create request: %v", err)
+		}
+
+		// Create a response recorder to capture the response
+		rr := httptest.NewRecorder()
+
+		// Serve the request using the router
+		r.ServeHTTP(rr, req)
+
+		// Check the status code
+		if rr.Code != tt.expectedCode {
+			t.Errorf("expected status %d but got %d for bucket: %s", tt.expectedCode, rr.Code, tt.bucketName)
+		}
+
+		// Check the response body
+		if rr.Body.String() != tt.expectedBody {
+			t.Errorf("expected body %q but got %q for bucket: %s", tt.expectedBody, rr.Body.String(), tt.bucketName)
+		}
+	}
+}
