@@ -434,3 +434,59 @@ func TestHandleListObjects(t *testing.T) {
         }
     }
 }
+
+// Test for HandleGetBucket
+func TestHandleGetBucket(t *testing.T) {
+	// Mock storage
+	mockStorage := &MockStorage{
+		CheckBucketExistsFunc: func(bucketName string) (bool, error) {
+			if bucketName == "existing-bucket" {
+				return true, nil
+			}
+			return false, nil
+		},
+	}
+
+	// Initialize the router with mock storage
+	r := mux.NewRouter()
+	r.HandleFunc("/{bucketName}/", handlers.HandleGetBucket(mockStorage)).Methods("GET")
+
+	tests := []struct {
+		bucketName   string
+		location     string
+		expectedCode int
+		expectedBody string
+	}{
+		{"existing-bucket", "", http.StatusOK, "Bucket exists and is accessible."},
+		{"existing-bucket", "location", http.StatusOK, "<LocationConstraint>us-east-1</LocationConstraint>"},
+		{"nonexistent-bucket", "", http.StatusNotFound, "Bucket not found\n"},
+	}
+
+	for _, tt := range tests {
+		// Create a GET request
+		reqURL := "/" + tt.bucketName + "/"
+		if tt.location != "" {
+			reqURL += "?location=" + tt.location
+		}
+		req, err := http.NewRequest("GET", reqURL, nil)
+		if err != nil {
+			t.Fatalf("could not create request: %v", err)
+		}
+
+		// Create a response recorder to capture the response
+		rr := httptest.NewRecorder()
+
+		// Serve the request using the router
+		r.ServeHTTP(rr, req)
+
+		// Check the status code
+		if rr.Code != tt.expectedCode {
+			t.Errorf("expected status %d but got %d for bucket: %s", tt.expectedCode, rr.Code, tt.bucketName)
+		}
+
+		// Check the response body
+		if rr.Body.String() != tt.expectedBody {
+			t.Errorf("expected body %q but got %q", tt.expectedBody, rr.Body.String())
+		}
+	}
+}
