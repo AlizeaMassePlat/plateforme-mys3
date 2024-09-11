@@ -612,3 +612,58 @@ func TestHandleDeleteBucket(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleListBuckets(t *testing.T) {
+	// Set up the mock storage
+	mockStorage := &MockStorage{
+		ListBucketsFunc: func() []string {
+			// Return some bucket names
+			return []string{"bucket1", "bucket2", "bucket3"}
+		},
+	}
+
+	// Initialize the router with the handler and the mock storage
+	r := mux.NewRouter()
+	r.HandleFunc("/", handlers.HandleListBuckets(mockStorage)).Methods("GET")
+
+	// Create a GET request to list buckets
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatalf("could not create request: %v", err)
+	}
+
+	// Create a response recorder to capture the response
+	rr := httptest.NewRecorder()
+
+	// Serve the request using the router
+	r.ServeHTTP(rr, req)
+
+	// Check the status code
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d but got %d", http.StatusOK, rr.Code)
+	}
+
+	// Parse the response body
+	var listBucketsResult dto.ListAllMyBucketsResult
+	err = xml.NewDecoder(bytes.NewBuffer(rr.Body.Bytes())).Decode(&listBucketsResult)
+	if err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+
+	// Check that the response contains the correct buckets
+	expectedBuckets := []string{"bucket1", "bucket2", "bucket3"}
+	if len(listBucketsResult.Buckets) != len(expectedBuckets) {
+		t.Fatalf("expected %d buckets but got %d", len(expectedBuckets), len(listBucketsResult.Buckets))
+	}
+
+	for i, bucket := range listBucketsResult.Buckets {
+		if bucket.Name != expectedBuckets[i] {
+			t.Errorf("expected bucket name %q but got %q", expectedBuckets[i], bucket.Name)
+		}
+	}
+
+	// Check that the response content type is set to "application/xml"
+	if contentType := rr.Header().Get("Content-Type"); contentType != "application/xml" {
+		t.Errorf("expected content type application/xml but got %q", contentType)
+	}
+}
