@@ -5,7 +5,10 @@ import (
 	"encoding/xml"
 	"net/http"
 	"net/http/httptest"
+	"os"       
 	"testing"
+	"github.com/gorilla/mux" 
+	"my-s3-clone/handlers"   
 	"my-s3-clone/router"
 	"my-s3-clone/dto"
 	"my-s3-clone/storage"
@@ -14,11 +17,15 @@ import (
 // MockStorage is a mock implementation of the Storage interface
 type MockStorage struct {
 	storage.Storage
+	DeleteObjectFunc func(bucketName, objectKey string) error
 }
 
 // Mock implementation of the DeleteObject method
 func (m *MockStorage) DeleteObject(bucketName, objectKey string) error {
-	return nil // Simulate successful deletion
+	if m.DeleteObjectFunc != nil {
+		return m.DeleteObjectFunc(bucketName, objectKey)
+	}
+	return nil
 }
 
 // Test for the /probe-bsign{suffix:.*} route
@@ -111,5 +118,52 @@ func TestHandleDeleteBatch(t *testing.T) {
 		if obj.Key != expectedDeleted[i] {
 			t.Errorf("expected deleted object %s, got %s", expectedDeleted[i], obj.Key)
 		}
+	}
+}
+
+// Test for deleting a single object
+func TestHandleDeleteObject(t *testing.T) {
+	// Create a new instance of the mock storage
+	mockStorage := &MockStorage{
+		DeleteObjectFunc: func(bucketName, objectName string) error {
+			if bucketName == "test-bucket" && objectName == "test-object" {
+				return nil 
+			}
+			return os.ErrNotExist 
+		},
+	}
+
+	// Initialize the router with the mock storage
+	r := mux.NewRouter()
+	r.HandleFunc("/{bucketName}/{objectName}", handlers.HandleDeleteObject(mockStorage)).Methods("DELETE")
+
+	// Create a DELETE request for the object
+	req, err := http.NewRequest("DELETE", "/test-bucket/test-object", nil)
+	if err != nil {
+		t.Fatalf("could not create request: %v", err)
+	}
+
+	// Create a response recorder to capture the response
+	rr := httptest.NewRecorder()
+
+	// Serve the request using the router
+	r.ServeHTTP(rr, req)
+
+	// Check the status code
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d but got %d", http.StatusOK, rr.Code)
+	}
+
+	// Check the response body
+	var deleteResult dto.DeleteResult
+	err = xml.Unmarshal(rr.Body.Bytes(), &deleteResult)
+	if err != nil {
+		t.Fatalf("Error unmarshaling response body: %v", err)
+	}
+
+	// Validate that the deleted object key matches the request
+	expectedKey := "test-object"
+	if len(deleteResult.DeletedResult) != 1 || deleteResult.DeletedResult[0].Key != expectedKey {
+		t.Errorf("expected deleted object %s, got %v", expectedKey, deleteResult.DeletedResult)
 	}
 }

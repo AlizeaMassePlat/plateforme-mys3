@@ -280,6 +280,7 @@ func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
         err := s.DeleteObject(bucketName, objectName)
         if err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
+            log.Printf("Error deleting object: %v", err)
             return
         }
 
@@ -292,12 +293,17 @@ func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
         response, err := xml.Marshal(deleteResult)
         if err != nil {
             http.Error(w, "Error generating XML response", http.StatusInternalServerError)
+            log.Printf("Error generating XML response: %v", err)
             return
         }
 
         w.Header().Set("Content-Type", "application/xml")
         w.WriteHeader(http.StatusOK)
         w.Write(response)
+
+        // Log response status and body
+        log.Printf("Response status: %d", http.StatusOK)
+        log.Printf("Response body: %s", string(response))
     }
 }
 
@@ -312,23 +318,29 @@ func HandleDeleteBatch(s storage.Storage) http.HandlerFunc {
         body, err := io.ReadAll(r.Body)
         if err != nil {
             http.Error(w, "Error reading request body", http.StatusInternalServerError)
+            log.Printf("Error reading request body: %v", err)
             return
         }
+        log.Printf("Request body: %s", string(body))
 
         var deleteReq dto.DeleteBatchRequest
         err = xml.Unmarshal(body, &deleteReq)
         if err != nil {
             http.Error(w, "Error parsing XML", http.StatusInternalServerError)
+            log.Printf("Error parsing XML: %v", err)
             return
         }
 
         var deletedObjects []dto.Deleted
         for _, objectToDelete := range deleteReq.Objects {
+            log.Printf("Attempting to delete object: %s", objectToDelete.Key)
             err := s.DeleteObject(bucketName, objectToDelete.Key)
             if err != nil {
                 http.Error(w, "Error deleting object", http.StatusInternalServerError)
+                log.Printf("Error deleting object %s: %v", objectToDelete.Key, err)
                 return
             }
+            log.Printf("Successfully deleted object: %s", objectToDelete.Key)
 
             deletedObjects = append(deletedObjects, dto.Deleted{Key: objectToDelete.Key})
         }
@@ -340,11 +352,16 @@ func HandleDeleteBatch(s storage.Storage) http.HandlerFunc {
         response, err := xml.Marshal(deleteResult)
         if err != nil {
             http.Error(w, "Error generating XML response", http.StatusInternalServerError)
+            log.Printf("Error generating XML response: %v", err)
             return
         }
 
         w.Header().Set("Content-Type", "application/xml")
         w.WriteHeader(http.StatusOK)
         w.Write(response)
+
+        // Log response status and body
+        log.Printf("Response status: %d", http.StatusOK)
+        log.Printf("Response body: %s", string(response))
     }
 }
