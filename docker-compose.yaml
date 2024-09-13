@@ -32,6 +32,20 @@ services:
     networks:
       - mynetwork
 
+  artillery:
+    image: node:18-alpine  # Utiliser une image Node.js pour installer Artillery
+    container_name: artillery
+    working_dir: /usr/src/app
+    volumes:
+      - ./tests:/usr/src/app  # Dossier contenant les fichiers de test Artillery
+      - ./reports:/usr/src/app/reports  # Dossier pour les rapports
+    networks:
+      - mynetwork
+    depends_on:
+      - my-s3-clone
+    command: >
+      sh -c "npm install -g artillery && artillery run test.yaml --output reports/report.json && artillery report --output reports/report.html reports/report.json"
+      
 networks:
   mynetwork:
     driver: bridge
