@@ -4,7 +4,6 @@ import (
 	"io"
 	"time"
 	"my-s3-clone/dto"
-	"os"
 
 )
 
@@ -13,7 +12,7 @@ type Storage interface {
     AddObject(bucketName, objectName string, data io.Reader, contentSha256 string) error
     DeleteObject(bucketName, objectName string) error
     DeleteBucket(bucketName string) error
-    GetObject(bucketName, objectName string) ([]byte, FileInfo, error)
+    GetObject(bucketName, objectName string) ([]byte, dto.FileInfo, error)
     CheckObjectExist(bucketName, objectName string) (bool, time.Time, int64, error)
     CheckBucketExists(bucketName string) (bool, error)
     ListBuckets() []string
@@ -21,12 +20,4 @@ type Storage interface {
     CreateBucket(bucketName string) error
 }
 
-// FileInfo représente les métadonnées d'un fichier (objet)
-type FileInfo interface {
-    Name() string       // Nom de base du fichier
-    Size() int64        // Taille logique du fichier en octets
-    Mode() os.FileMode  // Informations sur le mode de fichier
-    ModTime() time.Time // Heure de dernière modification
-    IsDir() bool        // Indique si c'est un répertoire
-    Sys() interface{}   // Données spécifiques au système sous-jacent
-}
+

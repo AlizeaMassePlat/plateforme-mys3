@@ -67,7 +67,7 @@ func ProcessChunkedStream(reader io.Reader, writer io.Writer) error {
             return fmt.Errorf("error discarding CRLF: %v", err)
         }
 
-        // Log chunk signature (optional)
+        // Log chunk signature 
         if len(parts) > 1 {
             chunkSignature := parts[1]
             log.Printf("Chunk signature: %s", chunkSignature)
@@ -218,7 +218,7 @@ func (fs *FileStorage) CreateBucket(bucketName string) error {
 }
 
 // Récupération d'un objet dans un bucket
-func (fs *FileStorage) GetObject(bucketName, objectName string) ([]byte, FileInfo, error) {
+func (fs *FileStorage) GetObject(bucketName, objectName string) ([]byte, dto.FileInfo, error) {
 	objectPath := filepath.Join(storageRoot, bucketName, objectName)
 	log.Printf("Tentative de récupération de l'objet : %s", objectPath)
 
@@ -230,14 +230,14 @@ func (fs *FileStorage) GetObject(bucketName, objectName string) ([]byte, FileInf
 	}
 
 	// Récupérer les métadonnées du fichier
-	fileInfo, err := os.Stat(objectPath)
+	FileInfo, err := os.Stat(objectPath)
 	if err != nil {
 		log.Printf("Erreur lors de la récupération des métadonnées du fichier: %v", err)
 		return nil, nil, err
 	}
 
 	// Retourner le contenu du fichier et les métadonnées encapsulées dans fileInfoWrapper
-	return data, &fileInfoWrapper{fileInfo: fileInfo}, nil
+	return data, &dto.FileInfoWrapper{FileInfo: FileInfo}, nil
 }
 
 // Vérification de l'existence d'un objet dans un bucket

@@ -11,7 +11,6 @@ import (
 	"my-s3-clone/handlers"
 	"my-s3-clone/router"
 	"my-s3-clone/dto"
-	"my-s3-clone/storage"
 	"io"
 	"time"
 	"fmt"
@@ -38,7 +37,7 @@ type MockStorage struct {
 	CheckBucketExistsFunc func(bucketName string) (bool, error)
 	CheckObjectExistFunc  func(bucketName, objectName string) (bool, time.Time, int64, error)
 	DeleteBucketFunc      func(bucketName string) error
-	GetObjectFunc         func(bucketName, objectName string) ([]byte, storage.FileInfo, error)
+	GetObjectFunc         func(bucketName, objectName string) ([]byte, dto.FileInfo, error)
 	ListBucketsFunc       func() []string
 	ListObjectsFunc       func(bucketName, prefix, marker string, maxKeys int) (dto.ListObjectsResponse, error)
 	CreateBucketFunc      func(bucketName string) error
@@ -80,7 +79,7 @@ func (m *MockStorage) DeleteBucket(bucketName string) error {
 	return nil
 }
 
-func (m *MockStorage) GetObject(bucketName, objectName string) ([]byte, storage.FileInfo, error) {
+func (m *MockStorage) GetObject(bucketName, objectName string) ([]byte, dto.FileInfo, error) {
 	if m.GetObjectFunc != nil {
 		return m.GetObjectFunc(bucketName, objectName)
 	}
@@ -536,15 +535,19 @@ func TestHandleCreateBucket(t *testing.T) {
 		}
 
 		// Check the response body
-		if tt.expectedCode == http.StatusOK {
-			var response dto.ListAllMyBucketsResult
-			err := xml.Unmarshal(rr.Body.Bytes(), &response)
-			if err != nil {
-				t.Fatalf("Error unmarshaling response body: %v", err)
-			}
 
-			if response.Buckets[0].Name != tt.bucketName {
-				t.Errorf("expected bucket name %q but got %q", tt.bucketName, response.Buckets[0].Name)
+		if tt.expectedCode == http.StatusOK {
+			// Définir la réponse XML attendue
+			xmlResponse := `<CreateBucketConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">` +
+				`<LocationConstraint>Europe</LocationConstraint>` +
+				`</CreateBucketConfiguration>`
+	
+			// Récupérer la réponse brute depuis le body de la requête
+			actualResponse := rr.Body.String()  // Convertir les bytes en string pour la comparaison
+	
+			// Comparer directement la réponse reçue avec la réponse attendue
+			if actualResponse != xmlResponse {
+				t.Errorf("Expected XML response to be: %s, but got: %s", xmlResponse, actualResponse)
 			}
 		} else if rr.Body.String() != tt.expectedBody {
 			t.Errorf("expected body %q but got %q", tt.expectedBody, rr.Body.String())

@@ -71,20 +71,19 @@ func HandleCreateBucket(s storage.Storage) http.HandlerFunc {
             return
         }
 
-        bucketResponse := dto.ListAllMyBucketsResult{
-            Buckets: []dto.Bucket{
-                {
-                    Name:         bucketName,
-                    CreationDate: time.Now(),
-                },
-            },
-        }
+        // Préparer la réponse XML
+        xmlResponse := `<CreateBucketConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">` +
+            `<LocationConstraint>Europe</LocationConstraint>` +
+            `</CreateBucketConfiguration>`
 
+        // Configurer les en-têtes de réponse
         w.Header().Set("Content-Type", "application/xml")
-        w.Header().Set("location", r.URL.String())
+        w.Header().Set("Location", r.URL.String())
         w.WriteHeader(http.StatusOK)
-        if err := xml.NewEncoder(w).Encode(bucketResponse); err != nil {
-            http.Error(w, "Erreur lors de l'encodage XML", http.StatusInternalServerError)
+
+        // Écrire la réponse XML
+        if _, err := w.Write([]byte(xmlResponse)); err != nil {
+            log.Printf("Error writing XML response: %v", err)
         }
     }
 }
@@ -354,5 +353,114 @@ func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
         // Log response status and body
         log.Printf("Response status: %d", http.StatusOK)
         log.Printf("Response body: %s", string(response))
+    }
+}
+
+func HandleBucketLocation(s storage.Storage) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        vars := mux.Vars(r)
+        bucketName := vars["bucketName"]
+            // La chaîne représentant la date
+    dateString := "2024-09-16T10:12:24Z"
+
+    // Convertir la chaîne en time.Time
+    creationDate, err := time.Parse(time.RFC3339, dateString)
+    if err != nil {
+        fmt.Printf("Error parsing date: %v\n", err)
+        return
+    }
+        bucket := dto.Bucket{
+            Name:         bucketName,
+            CreationDate: creationDate,
+            LocationConstraint : "us-east-1",
+        }
+
+        response, err := xml.Marshal(bucket)
+        if err != nil {
+            http.Error(w, "Error generating XML response", http.StatusInternalServerError)
+            log.Printf("Error generating XML response: %v", err)
+            return
+        }
+
+        
+        w.Header().Set("Content-Type", "application/xml")
+        w.WriteHeader(http.StatusOK)
+        w.Write(response)
+            
+    }
+}
+
+func HandleBucketLockConfig(s storage.Storage) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        vars := mux.Vars(r)
+        bucketName := vars["bucketName"]
+
+        dateString := "2024-09-16T10:12:24Z"
+
+        // Convertir la chaîne en time.Time
+        creationDate, err := time.Parse(time.RFC3339, dateString)
+        if err != nil {
+            fmt.Printf("Error parsing date: %v\n", err)
+            return
+        }
+
+        bucket := dto.Bucket{
+            Name:         bucketName,
+            CreationDate: creationDate,
+            ObjectLockConfig : "true",
+        }
+    
+
+        response, err := xml.Marshal(bucket)
+        if err != nil {
+            http.Error(w, "Error generating XML response", http.StatusInternalServerError)
+            log.Printf("Error generating XML response: %v", err)
+            return
+        }
+
+        
+        w.Header().Set("Content-Type", "application/xml")
+        w.WriteHeader(http.StatusOK)
+        w.Write(response)
+            
+            
+    }
+}
+
+
+func HandleBucketDelimiter(s storage.Storage) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        vars := mux.Vars(r)
+        bucketName := vars["bucketName"]
+
+        dateString := "2024-09-16T10:12:24Z"
+
+        // Convertir la chaîne en time.Time
+        creationDate, err := time.Parse(time.RFC3339, dateString)
+        if err != nil {
+            fmt.Printf("Error parsing date: %v\n", err)
+            return
+        }
+
+        bucket := dto.Bucket{
+            Name:         bucketName,
+            CreationDate: creationDate,
+            ObjectDelimiter : "true",
+        }
+    
+
+        response, err := xml.Marshal(bucket)
+        if err != nil {
+            http.Error(w, "Error generating XML response", http.StatusInternalServerError)
+            log.Printf("Error generating XML response: %v", err)
+            return
+        }
+
+        
+        w.Header().Set("Content-Type", "application/xml")
+        w.WriteHeader(http.StatusOK)
+        w.Write(response)
+            
+            
     }
 }

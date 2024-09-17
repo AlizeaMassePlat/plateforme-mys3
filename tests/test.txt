@@ -1,0 +1,38 @@
+Rapport de test de montée en charge : 
+
+Outil utilisé : hey
+
+URL testée : http://localhost:9090
+
+Nombre total de requêtes : 1000
+Durée totale du test : 0.914 secondes
+
+Résumé des Performances : 
+
+Requêtes par seconde : 1093.58
+Temps de réponse moyen : 0.0090 secondes
+Temps de réponse le plus rapide : 0.0036 secondes
+Temps de réponse le plus lent : 0.0476 secondes
+
+Distribution des Temps de Réponse
+0.004 à 0.008 secondes : 424 requêtes
+0.008 à 0.012 secondes : 524 requêtes
+0.012 à 0.017 secondes : 27 requêtes
+Plus de 0.017 secondes : Très peu de requêtes
+Latence
+10% des requêtes : ≤ 0.0066 secondes
+25% des requêtes : ≤ 0.0073 secondes
+50% des requêtes (médiane) : ≤ 0.0083 secondes
+75% des requêtes : ≤ 0.0095 secondes
+90% des requêtes : ≤ 0.0109 secondes
+95% des requêtes : ≤ 0.0124 secondes
+99% des requêtes : ≤ 0.0450 secondes
+
+Statistiques de Réponses
+200 OK : 1000 réponses (100%)
+
+Conclusion
+Performance: Le serveur a géré 1093 requêtes par seconde avec un temps de réponse moyen de 0.0090 secondes.
+Stabilité: Les temps de réponse sont cohérents, avec 90% des réponses traitées en moins de 0.0109 secondes.
+Fiabilité: Aucun code d'erreur n’a été rencontré, toutes les requêtes ont reçu une réponse correcte.
+Ce test démontre que le serveur est capable de gérer efficacement une charge élevée avec de bonnes performances et une faible latence.

@@ -13,4 +13,7 @@ type ListAllMyBucketsResult struct {
 type Bucket struct {
     Name         string    `xml:"Name"`
     CreationDate time.Time `xml:"CreationDate"`
+    LocationConstraint   string   `xml:"LocationConstraint,omitempty"`
+    ObjectLockConfig   string   `xml:"ObjectLockConfiguration,omitempty"`
+    ObjectDelimiter   string   `xml:"ObjectDelimiter,omitempty"`
 }
