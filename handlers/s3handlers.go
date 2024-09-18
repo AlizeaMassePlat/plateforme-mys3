@@ -53,6 +53,42 @@ func HandleListBuckets(s storage.Storage) http.HandlerFunc {
 }
 
 // Create a bucket
+// func HandleCreateBucket(s storage.Storage) http.HandlerFunc {
+//     return func(w http.ResponseWriter, r *http.Request) {
+//         log.Printf("Received request: %s %s", r.Method, r.URL.Path)
+
+//         if r.Method != "PUT" {
+//             http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+//             return
+//         }
+
+//         vars := mux.Vars(r)
+//         bucketName := vars["bucketName"]
+
+//         err := s.CreateBucket(bucketName)
+//         if err != nil {
+//             http.Error(w, err.Error(), http.StatusInternalServerError)
+//             return
+//         }
+
+//         bucketResponse := dto.ListAllMyBucketsResult{
+//             Buckets: []dto.Bucket{
+//                 {
+//                     Name:         bucketName,
+//                     CreationDate: time.Now(),
+//                 },
+//             },
+//         }
+
+//         w.Header().Set("Content-Type", "application/xml")
+//         w.Header().Set("location", r.URL.String())
+//         w.WriteHeader(http.StatusOK)
+//         if err := xml.NewEncoder(w).Encode(bucketResponse); err != nil {
+//             http.Error(w, "Erreur lors de l'encodage XML", http.StatusInternalServerError)
+//         }
+//     }
+// }
+
 func HandleCreateBucket(s storage.Storage) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         log.Printf("Received request: %s %s", r.Method, r.URL.Path)
@@ -65,12 +101,26 @@ func HandleCreateBucket(s storage.Storage) http.HandlerFunc {
         vars := mux.Vars(r)
         bucketName := vars["bucketName"]
 
-        err := s.CreateBucket(bucketName)
+        // Vérification si le bucket existe déjà
+        exists, err := s.CheckBucketExists(bucketName) // Assurez-vous que cette fonction existe dans votre interface Storage
+        if err != nil {
+            http.Error(w, "Erreur lors de la vérification du bucket", http.StatusInternalServerError)
+            return
+        }
+
+        if exists {
+            http.Error(w, fmt.Sprintf("Bucket '%s' already exists", bucketName), http.StatusConflict)
+            return
+        }
+
+        // Création du bucket si il n'existe pas
+        err = s.CreateBucket(bucketName)
         if err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
             return
         }
 
+        // Réponse pour indiquer que le bucket a été créé avec succès
         bucketResponse := dto.ListAllMyBucketsResult{
             Buckets: []dto.Bucket{
                 {
@@ -81,15 +131,52 @@ func HandleCreateBucket(s storage.Storage) http.HandlerFunc {
         }
 
         w.Header().Set("Content-Type", "application/xml")
-        w.Header().Set("location", r.URL.String())
-        w.WriteHeader(http.StatusOK)
+        w.Header().Set("Location", r.URL.String())
+        w.WriteHeader(http.StatusCreated) // 201 Created
         if err := xml.NewEncoder(w).Encode(bucketResponse); err != nil {
             http.Error(w, "Erreur lors de l'encodage XML", http.StatusInternalServerError)
         }
     }
 }
 
+
+
 // Get bucket info or location
+// func HandleGetBucket(s storage.Storage) http.HandlerFunc {
+//     return func(w http.ResponseWriter, r *http.Request) {
+//         vars := mux.Vars(r)
+//         bucketName := vars["bucketName"]
+
+//         log.Printf("Requête GET pour le bucket: %s", bucketName)
+
+//         locationParam := r.URL.Query().Get("location")
+//         log.Printf("Location Param: %s", locationParam)
+
+//         if locationParam != "" {
+//             log.Printf("Demande de localisation pour le bucket: %s", bucketName)
+//             w.Header().Set("Content-Type", "application/xml")
+//             w.WriteHeader(http.StatusOK)
+//             w.Write([]byte(`<LocationConstraint>us-east-1</LocationConstraint>`))
+//             return
+//         }
+
+//         exists, err := s.CheckBucketExists(bucketName)
+//         if err != nil || !exists {
+//             if err != nil {
+//                 log.Printf("Erreur lors de la vérification du bucket: %v", err)
+//                 http.Error(w, "Internal server error", http.StatusInternalServerError)
+//             } else {
+//                 log.Printf("Bucket non trouvé: %s", bucketName)
+//                 http.Error(w, "Bucket not found", http.StatusNotFound)
+//             }
+//             return
+//         }
+
+//         w.WriteHeader(http.StatusOK)
+//         w.Write([]byte("Bucket exists and is accessible."))
+//     }
+// }
+
 func HandleGetBucket(s storage.Storage) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         vars := mux.Vars(r)
@@ -97,6 +184,7 @@ func HandleGetBucket(s storage.Storage) http.HandlerFunc {
 
         log.Printf("Requête GET pour le bucket: %s", bucketName)
 
+        // Gérer le paramètre de localisation
         locationParam := r.URL.Query().Get("location")
         log.Printf("Location Param: %s", locationParam)
 
@@ -108,20 +196,24 @@ func HandleGetBucket(s storage.Storage) http.HandlerFunc {
             return
         }
 
+        // Vérifier si le bucket existe
         exists, err := s.CheckBucketExists(bucketName)
-        if err != nil || !exists {
-            if err != nil {
-                log.Printf("Erreur lors de la vérification du bucket: %v", err)
-                http.Error(w, "Internal server error", http.StatusInternalServerError)
-            } else {
-                log.Printf("Bucket non trouvé: %s", bucketName)
-                http.Error(w, "Bucket not found", http.StatusNotFound)
-            }
+        if err != nil {
+            log.Printf("Erreur lors de la vérification du bucket: %v", err)
+            http.Error(w, "Internal server error", http.StatusInternalServerError)
             return
         }
 
+        if !exists {
+            log.Printf("Bucket non trouvé: %s", bucketName)
+            http.Error(w, fmt.Sprintf("Bucket '%s' not found", bucketName), http.StatusNotFound)
+            return
+        }
+
+        // Si le bucket existe
+        log.Printf("Bucket %s existe et est accessible", bucketName)
         w.WriteHeader(http.StatusOK)
-        w.Write([]byte("Bucket exists and is accessible."))
+        w.Write([]byte(fmt.Sprintf("Bucket '%s' exists and is accessible.", bucketName)))
     }
 }
 
@@ -276,6 +368,27 @@ func HandleListObjects(s storage.Storage) http.HandlerFunc {
 }
 
 // Delete a bucket
+// func HandleDeleteBucket(s storage.Storage) http.HandlerFunc {
+//     return func(w http.ResponseWriter, r *http.Request) {
+//         log.Printf("Received request: %s %s", r.Method, r.URL.Path)
+//         vars := mux.Vars(r)
+//         bucketName := vars["bucketName"]
+
+//         if bucketName == "" {
+//             http.Error(w, "Bucket name is required", http.StatusBadRequest)
+//             return
+//         }
+
+//         err := s.DeleteBucket(bucketName)
+//         if err != nil {
+//             http.Error(w, err.Error(), http.StatusInternalServerError)
+//             return
+//         }
+
+//         w.WriteHeader(http.StatusNoContent)
+//     }
+// }
+
 func HandleDeleteBucket(s storage.Storage) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         log.Printf("Received request: %s %s", r.Method, r.URL.Path)
@@ -287,15 +400,27 @@ func HandleDeleteBucket(s storage.Storage) http.HandlerFunc {
             return
         }
 
+        // Tenter de supprimer le bucket
         err := s.DeleteBucket(bucketName)
         if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
+            // Si l'erreur indique que le bucket n'existe pas, renvoyer un code 404
+            if os.IsNotExist(err) {
+                log.Printf("Bucket %s does not exist", bucketName)
+                http.Error(w, fmt.Sprintf("Bucket %s does not exist", bucketName), http.StatusNotFound)
+                return
+            }
+            // Pour toute autre erreur, renvoyer un code 500
+            log.Printf("Error deleting bucket %s: %v", bucketName, err)
+            http.Error(w, "Failed to delete bucket", http.StatusInternalServerError)
             return
         }
 
+        // Répondre avec succès si le bucket est supprimé
+        log.Printf("Bucket %s deleted successfully", bucketName)
         w.WriteHeader(http.StatusNoContent)
     }
 }
+
 
 
 // Batch delete objects

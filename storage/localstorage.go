@@ -16,7 +16,7 @@ import (
 // FileStorage implémente l'interface Storage avec un stockage basé sur le système de fichiers
 type FileStorage struct{}
 
-const storageRoot = "/mydata/data"
+const storageRoot = "/plateforme-mys3/buckets"
 
 func ProcessChunkedStream(reader io.Reader, writer io.Writer) error {
     bufReader := bufio.NewReader(reader)
