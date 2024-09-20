@@ -12,6 +12,7 @@ import (
     "fmt"
     "os"
     "strconv"
+    "errors"
 )
 
 // List all buckets
@@ -335,6 +336,10 @@ func HandleDeleteBucket(s storage.Storage) http.HandlerFunc {
 // Batch delete objects
 func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodPost {
+            http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+            return
+        }
         log.Printf("Received POST ?delete request for batch deletion: %s %s", r.Method, r.URL.Path)
 
         vars := mux.Vars(r)
@@ -351,7 +356,7 @@ func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
         var deleteReq dto.DeleteObjectRequest
         err = xml.Unmarshal(body, &deleteReq)
         if err != nil {
-            http.Error(w, "Error parsing XML", http.StatusInternalServerError)
+            http.Error(w, "Error parsing XML", http.StatusBadRequest)
             log.Printf("Error parsing XML: %v", err)
             return
         }
@@ -361,6 +366,11 @@ func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
             log.Printf("Attempting to delete object: %s", objectToDelete.Key)
             err := s.DeleteObject(bucketName, objectToDelete.Key)
             if err != nil {
+                if errors.Is(err, os.ErrNotExist) { // Vérifie si l'erreur correspond à l'objet non trouvé
+                    http.Error(w, "Object not found", http.StatusNotFound)
+                    log.Printf("Object not found: %s", objectToDelete.Key)
+                    continue 
+                }
                 http.Error(w, "Error deleting object", http.StatusInternalServerError)
                 log.Printf("Error deleting object %s: %v", objectToDelete.Key, err)
                 return
@@ -385,7 +395,7 @@ func HandleDeleteObject(s storage.Storage) http.HandlerFunc {
         w.WriteHeader(http.StatusOK)
         w.Write(response)
 
-        // Log response status and body
+                // Log response status and body
         log.Printf("Response status: %d", http.StatusOK)
         log.Printf("Response body: %s", string(response))
     }

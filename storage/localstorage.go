@@ -291,7 +291,7 @@ func (fs *FileStorage) DeleteObject(bucketName, objectName string) error {
 
     if _, err := os.Stat(objectPath); os.IsNotExist(err) {
         log.Printf("Object %s does not exist in bucket %s", objectName, bucketName)
-        return err
+        return fmt.Errorf("object not found: %w", err) // Retourne une erreur "object not found" encapsulant l'erreur 404
     }
 
     err := os.Remove(objectPath)
