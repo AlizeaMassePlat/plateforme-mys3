@@ -217,6 +217,7 @@ func HandleDownloadObject(s storage.Storage) http.HandlerFunc {
         bucketName := vars["bucketName"]
         objectName := vars["objectName"]
 
+        // Récupérer les données du fichier et ses métadonnées
         data, fileInfo, err := s.GetObject(bucketName, objectName)
         if err != nil {
             if os.IsNotExist(err) {
@@ -227,10 +228,13 @@ func HandleDownloadObject(s storage.Storage) http.HandlerFunc {
             return
         }
 
-        w.Header().Set("Content-Type", "application/octet-stream")
+        // Envoyer les métadonnées dans les en-têtes HTTP
         w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", objectName))
-        w.Header().Set("Last-Modified", fileInfo.ModTime().Format(http.TimeFormat))
         w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+        w.Header().Set("Last-Modified", fileInfo.ModTime().Format(http.TimeFormat))
+
+        // Envoyer le contenu du fichier
+        w.Header().Set("Content-Type", "application/octet-stream")
         w.WriteHeader(http.StatusOK)
 
         if _, err := w.Write(data); err != nil {
