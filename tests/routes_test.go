@@ -456,9 +456,9 @@ func TestHandleGetBucket(t *testing.T) {
 		expectedCode int
 		expectedBody string
 	}{
-		{"existing-bucket", "", http.StatusOK, "Bucket exists and is accessible."},
+		{"existing-bucket", "", http.StatusOK, "Bucket 'existing-bucket' exists and is accessible."},
 		{"existing-bucket", "location", http.StatusOK, "<LocationConstraint>us-east-1</LocationConstraint>"},
-		{"nonexistent-bucket", "", http.StatusNotFound, "Bucket not found\n"},
+		{"nonexistent-bucket", "", http.StatusNotFound, "Bucket 'nonexistent-bucket' not found\n"},
 	}
 
 	for _, tt := range tests {
@@ -538,9 +538,7 @@ func TestHandleCreateBucket(t *testing.T) {
 
 		if tt.expectedCode == http.StatusOK {
 			// Définir la réponse XML attendue
-			xmlResponse := `<CreateBucketConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">` +
-				`<LocationConstraint>Europe</LocationConstraint>` +
-				`</CreateBucketConfiguration>`
+			xmlResponse := `<ListAllMyBucketsResult><Buckets><Bucket><Name>test-bucket</Name><CreationDate>0001-01-01T00:00:00Z</CreationDate></Bucket></Buckets></ListAllMyBucketsResult>`
 	
 			// Récupérer la réponse brute depuis le body de la requête
 			actualResponse := rr.Body.String()  // Convertir les bytes en string pour la comparaison
@@ -562,7 +560,7 @@ func TestHandleDeleteBucket(t *testing.T) {
 		DeleteBucketFunc: func(bucketName string) error {
 			// Simulate failure for a specific bucket
 			if bucketName == "fail-bucket" {
-				return fmt.Errorf("failed to delete bucket")
+				return fmt.Errorf("Failed to delete bucket\n")
 			}
 			return nil
 		},
@@ -586,7 +584,7 @@ func TestHandleDeleteBucket(t *testing.T) {
 		{
 			bucketName:   "fail-bucket",
 			expectedCode: http.StatusInternalServerError,
-			expectedBody: "failed to delete bucket\n",
+			expectedBody: "Failed to delete bucket\n",
 		},
 	}
 

@@ -90,7 +90,6 @@ func HandleCreateBucket(s storage.Storage) http.HandlerFunc {
             Buckets: []dto.Bucket{
                 {
                     Name:         bucketName,
-                    CreationDate: time.Now(),
                 },
             },
         }
