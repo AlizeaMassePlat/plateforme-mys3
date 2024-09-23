@@ -43,7 +43,7 @@ jobs:
       # Étape 7 : Envoyer des notifications Google Chat
       - name: Send notification to Google Chat on success
         run: |
-          curl -X POST -H 'Content-Type: application/json' \
+          curl -v -X POST -H 'Content-Type: application/json' \
           -d '{
               "text": "Pipeline succeeded for commit ${{ github.sha }} on branch ${{ github.ref }}."
             }' ${{ secrets.GCHAT_WEBHOOK_URL }}
