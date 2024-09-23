@@ -1,0 +1,58 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Étape 1 : Récupérer le code source
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Étape 2 : Installation des dépendances 
+      - name: Install dependencies
+        run: go mod download
+
+      # Étape 3 : Exécuter les tests
+      - name: Run tests
+        run: go test -v ./tests
+
+      # Étape 4 : Construire l'image Docker
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${{ github.sha }} .
+
+      # Étape 5 : Se connecter à Docker Hub
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # Étape 6 : Pousser l'image Docker
+      - name: Push Docker image
+        run: |
+          docker tag ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:latest
+
+      # Étape 7 : Envoyer des notifications Google Chat
+      - name: Send notification to Google Chat on success
+        run: |
+          curl -X POST -H 'Content-Type: application/json' \
+          -d '{
+              "text": "Pipeline succeeded for commit ${{ github.sha }} on branch ${{ github.ref }}."
+            }' ${{ secrets.GCHAT_WEBHOOK_URL }}
+        if: success()
+
+      - name: Send notification to Google Chat on failure
+        run: |
+          curl -X POST -H 'Content-Type: application/json' \
+          -d '{
+              "text": "Pipeline failed for commit ${{ github.sha }} on branch ${{ github.ref }}."
+            }' ${{ secrets.GCHAT_WEBHOOK_URL }}
+        if: failure()
