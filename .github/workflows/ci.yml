@@ -27,7 +27,7 @@ jobs:
       # Étape 4 : Obtenir le timestamp pour les images de développement
       - name: Get current timestamp
         if: github.ref == 'refs/heads/main'
-        run: echo "TIMESTAMP=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+        run: echo "TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)" >> $GITHUB_ENV
 
       # Étape 5 : Construire l'image Docker
       - name: Build Docker image for development (branch main)
