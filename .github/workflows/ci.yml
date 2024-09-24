@@ -46,7 +46,7 @@ jobs:
           curl -v -X POST -H 'Content-Type: application/json' \
           -d '{
               "text": "Pipeline succeeded for commit ${{ github.sha }} on branch ${{ github.ref }}."
-            }' ${{ secrets.GCHAT_WEBHOOK_URL }}\&token=jOm8hGY_zEOW4WHPXe13-l78WBEw5OeWzia57kUZnl0
+            }' ${{ secrets.GCHAT_WEBHOOK_URL }}&token=jOm8hGY_zEOW4WHPXe13-l78WBEw5OeWzia57kUZnl0
         if: success()
 
       - name: Send notification to Google Chat on failure
