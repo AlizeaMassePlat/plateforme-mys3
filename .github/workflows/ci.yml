@@ -24,23 +24,42 @@ jobs:
       - name: Run tests
         run: go test -v ./tests
 
-      # Étape 4 : Construire l'image Docker
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${{ github.sha }} .
+      # Étape 4 : Obtenir le timestamp pour les images de développement
+      - name: Get current timestamp
+        if: github.ref == 'refs/heads/main'
+        run: echo "TIMESTAMP=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
 
-      # Étape 5 : Se connecter à Docker Hub
+      # Étape 5 : Construire l'image Docker
+      - name: Build Docker image for development (branch main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:dev-${{ env.TIMESTAMP }} .
+      
+      - name: Build Docker image for production (tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${TAG_NAME} .
+
+      # Étape 6 : Se connecter à Docker Hub
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      # Étape 6 : Pousser l'image Docker
-      - name: Push Docker image
+      # Étape 7 : Pousser l'image Docker
+      - name: Push Docker image for development
+        if: github.ref == 'refs/heads/main'
         run: |
-          docker tag ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${{ github.sha }}
+          docker tag ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:dev-${{ env.TIMESTAMP }} ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:dev-${{ env.TIMESTAMP }}
           docker push ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:latest
 
-      # Étape 7 : Envoyer des notifications Google Chat
+      - name: Push Docker image for production
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${TAG_NAME}
+
+      # Étape 8 : Envoyer des notifications Google Chat
       - name: Send notification to Google Chat on success
         uses: julb/action-post-googlechat-message@v1
         with:
@@ -53,4 +72,4 @@ jobs:
         with:
           message: "Pipeline failed for commit ${{ github.sha }} on branch ${{ github.ref }}."
           gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
-        if: failure()
+        if: ${{ failure() }}
