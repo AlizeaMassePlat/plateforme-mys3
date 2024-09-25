@@ -29,6 +29,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: echo "TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)" >> $GITHUB_ENV
 
+      # --- SECTION DOCKER HUB ---
       # Étape 5 : Construire l'image Docker
       - name: Build Docker image for development (branch main)
         if: github.ref == 'refs/heads/main'
@@ -73,3 +74,18 @@ jobs:
           message: "Pipeline failed for commit ${{ github.sha }} on branch ${{ github.ref }}."
           gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
         if: ${{ failure() }}
+
+      # --- SECTION MINIKUBE ---
+      # Étape 9 : Configurer l'environnement Docker pour Minikube
+      - name: Set up Minikube Docker environment
+        run: eval $(minikube docker-env)
+
+      # Étape 10 : Construire l'image Docker pour Minikube
+      - name: Build Docker image for Minikube
+        run: |
+          docker build -t my-s3-clone:${{ github.sha }} .
+
+      # Étape 11 : Mettre à jour le déploiement sur Minikube
+      - name: Update Kubernetes Deployment in Minikube
+        run: |
+          kubectl set image deployment/my-s3-clone-deployment my-s3-clone=my-s3-clone:${{ github.sha }}

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-s3-clone-deployment
+  labels:
+    app: my-s3-clone
+spec:
+  replicas: 2  # Nombre de pods
+  selector:
+    matchLabels:
+      app: my-s3-clone
+  template:
+    metadata:
+      labels:
+        app: my-s3-clone
+    spec:
+      containers:
+      - name: my-s3-clone
+        image: alizeamasseplat/my-s3-clone:latest
+        ports:
+        - containerPort: 9090 
+        env:
+        - name: ENV_VARIABLE
+          value: "development"  
