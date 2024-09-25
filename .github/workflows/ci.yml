@@ -76,16 +76,27 @@ jobs:
         if: ${{ failure() }}
 
       # --- SECTION MINIKUBE ---
-      # Étape 9 : Configurer l'environnement Docker pour Minikube
+      # Étape 9 : Installer Minikube
+      - name: Install Minikube
+        run: |
+          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+          sudo install minikube-linux-amd64 /usr/local/bin/minikube
+
+      # Étape 10 : Démarrer Minikube
+      - name: Start Minikube
+        run: |
+          minikube start --driver=docker
+
+      # Étape 11 : Configurer l'environnement Docker pour Minikube
       - name: Set up Minikube Docker environment
         run: eval $(minikube docker-env)
 
-      # Étape 10 : Construire l'image Docker pour Minikube
+      # Étape 12 : Construire l'image Docker pour Minikube
       - name: Build Docker image for Minikube
         run: |
           docker build -t my-s3-clone:${{ github.sha }} .
 
-      # Étape 11 : Mettre à jour le déploiement sur Minikube
+      # Étape 13 : Mettre à jour le déploiement sur Minikube
       - name: Update Kubernetes Deployment in Minikube
         run: |
           kubectl set image deployment/my-s3-clone-deployment my-s3-clone=my-s3-clone:${{ github.sha }}
