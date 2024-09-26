@@ -86,7 +86,7 @@ jobs:
       # Étape 10 : Configurer l'accès à Kubernetes en créant le fichier kubeconfig
       - name: Set up kubeconfig
         run: |
-          mkdir -p ~/.kube                           # Créer le dossier ~/.kube
+          mkdir -p ~/.kube                           
           echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config  # Créer le fichier kubeconfig
 
       # Étape 11 : Vérifier que kubectl est bien configuré
