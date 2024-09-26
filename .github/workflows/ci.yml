@@ -74,26 +74,3 @@ jobs:
           message: "Pipeline failed for commit ${{ github.sha }} on branch ${{ github.ref }}."
           gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
         if: ${{ failure() }}
-
-      # --- SECTION MINIKUBE ---
-      # Étape 9 : Installer kubectl
-      - name: Install kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
-
-      # Étape 10 : Configurer l'accès à Kubernetes en créant le fichier kubeconfig
-      - name: Set up kubeconfig
-        run: |
-          mkdir -p ~/.kube                           
-          echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config  # Créer le fichier kubeconfig
-
-      # Étape 11 : Vérifier que kubectl est bien configuré
-      - name: Test kubectl configuration
-        run: kubectl get nodes
-
-      # Étape 12 : Mettre à jour le déploiement Kubernetes
-      - name: Update Kubernetes Deployment
-        run: |
-          kubectl set image deployment/my-s3-clone-deployment my-s3-clone=my-s3-clone:${{ github.sha }}
