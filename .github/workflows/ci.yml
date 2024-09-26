@@ -76,27 +76,17 @@ jobs:
         if: ${{ failure() }}
 
       # --- SECTION MINIKUBE ---
-      # Étape 9 : Installer Minikube
-      - name: Install Minikube
+      - name: Install kubectl
         run: |
-          curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-          sudo install minikube-linux-amd64 /usr/local/bin/minikube
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
 
-      # Étape 10 : Démarrer Minikube
-      - name: Start Minikube
-        run: |
-          minikube start --driver=docker
+      # Étape 3 : Configurer l'accès à Kubernetes
+      - name: Set up kubeconfig
+        run: echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
 
-      # Étape 11 : Configurer l'environnement Docker pour Minikube
-      - name: Set up Minikube Docker environment
-        run: eval $(minikube docker-env)
-
-      # Étape 12 : Construire l'image Docker pour Minikube
-      - name: Build Docker image for Minikube
-        run: |
-          docker build -t my-s3-clone:${{ github.sha }} .
-
-      # Étape 13 : Mettre à jour le déploiement sur Minikube
-      - name: Update Kubernetes Deployment in Minikube
+      # Étape 4 : Mettre à jour le déploiement
+      - name: Update Kubernetes Deployment
         run: |
           kubectl set image deployment/my-s3-clone-deployment my-s3-clone=my-s3-clone:${{ github.sha }}
