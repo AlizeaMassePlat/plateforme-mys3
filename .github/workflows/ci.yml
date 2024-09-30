@@ -73,13 +73,25 @@ jobs:
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
 
-      # Étape 10 : Récupérer les informations sur le déploiement Kubernetes
-      - name: Get deployment info
+      # Étape 10 : Extraire les informations du déploiement et du service
+      - name: Extract Kubernetes deployment and service info
         run: |
-          kubectl get deployment my-s3-clone-deployment -o json > deployment_info.json
-          kubectl get svc my-s3-clone-service -o json > service_info.json
+          DEPLOYMENT_NAME=my-s3-clone-deployment
+          SERVICE_NAME=my-s3-clone-service
 
-      # Étape 11 : Envoyer des notifications Google Chat sur le succès avec détails du déploiement
+          REPLICAS=$(kubectl get deployment $DEPLOYMENT_NAME -o jsonpath='{.status.replicas}')
+          READY_REPLICAS=$(kubectl get deployment $DEPLOYMENT_NAME -o jsonpath='{.status.readyReplicas}')
+          SERVICE_TYPE=$(kubectl get svc $SERVICE_NAME -o jsonpath='{.spec.type}')
+          EXTERNAL_IP=$(kubectl get svc $SERVICE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          PORT=$(kubectl get svc $SERVICE_NAME -o jsonpath='{.spec.ports[0].port}')
+
+          echo "REPLICAS=$REPLICAS" >> $GITHUB_ENV
+          echo "READY_REPLICAS=$READY_REPLICAS" >> $GITHUB_ENV
+          echo "SERVICE_TYPE=$SERVICE_TYPE" >> $GITHUB_ENV
+          echo "EXTERNAL_IP=$EXTERNAL_IP" >> $GITHUB_ENV
+          echo "PORT=$PORT" >> $GITHUB_ENV
+
+      # Étape 11 : Envoyer des notifications Google Chat avec les informations Kubernetes
       - name: Send success notification with Kubernetes info
         uses: julb/action-post-googlechat-message@v1
         with:
@@ -87,12 +99,12 @@ jobs:
             **Pipeline succeeded** for commit ${{ github.sha }} on branch ${{ github.ref }}.
             - Deployment Name: my-s3-clone-deployment
             - Namespace: default
-            - Replicas: $(jq '.status.replicas' deployment_info.json)
-            - Ready Replicas: $(jq '.status.readyReplicas' deployment_info.json)
+            - Replicas: ${{ env.REPLICAS }}
+            - Ready Replicas: ${{ env.READY_REPLICAS }}
             - Service Name: my-s3-clone-service
-            - Service Type: $(jq '.spec.type' service_info.json)
-            - External IP: $(jq '.status.loadBalancer.ingress[0].ip' service_info.json)
-            - Port: $(jq '.spec.ports[0].port' service_info.json)
+            - Service Type: ${{ env.SERVICE_TYPE }}
+            - External IP: ${{ env.EXTERNAL_IP }}
+            - Port: ${{ env.PORT }}
           gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
         if: ${{ success() }}
 
