@@ -59,31 +59,47 @@ jobs:
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
           docker push ${{ secrets.DOCKER_USERNAME }}/my-s3-clone:${TAG_NAME}-${{ env.TIMESTAMP }}
-
-      # Étape 8 : Envoyer des notifications Google Chat
-      - name: Send notification to Google Chat on success
-        uses: julb/action-post-googlechat-message@v1
-        with:
-          message: "Pipeline succeeded for commit ${{ github.sha }} on branch ${{ github.ref }}."
-          gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
-        if: ${{ success() }}
-
-      - name: Send notification to Google Chat on failure
-        uses: julb/action-post-googlechat-message@v1
-        with:
-          message: "Pipeline failed for commit ${{ github.sha }} on branch ${{ github.ref }}."
-          gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
-        if: ${{ failure() }}
-
+      
       # --- SECTION KUBERNETES ---
-      # Étape 9 : Configurer kubectl
+      # Étape 8 : Configurer kubectl
       - name: Setup kubectl
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG_CONTENT }}" > $HOME/.kube/config
 
-      # Étape 10 : Appliquer les fichiers Kubernetes
+      # Étape 9 : Appliquer les fichiers Kubernetes
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
+
+      # Étape 10 : Récupérer les informations sur le déploiement Kubernetes
+      - name: Get deployment info
+        run: |
+          kubectl get deployment my-s3-clone-deployment -o json > deployment_info.json
+          kubectl get svc my-s3-clone-service -o json > service_info.json
+
+      # Étape 11 : Envoyer des notifications Google Chat sur le succès avec détails du déploiement
+      - name: Send success notification with Kubernetes info
+        uses: julb/action-post-googlechat-message@v1
+        with:
+          message: |
+            **Pipeline succeeded** for commit ${{ github.sha }} on branch ${{ github.ref }}.
+            - Deployment Name: my-s3-clone-deployment
+            - Namespace: default
+            - Replicas: $(jq '.status.replicas' deployment_info.json)
+            - Ready Replicas: $(jq '.status.readyReplicas' deployment_info.json)
+            - Service Name: my-s3-clone-service
+            - Service Type: $(jq '.spec.type' service_info.json)
+            - External IP: $(jq '.status.loadBalancer.ingress[0].ip' service_info.json)
+            - Port: $(jq '.spec.ports[0].port' service_info.json)
+          gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
+        if: ${{ success() }}
+
+      # Étape 12 : Envoyer des notifications Google Chat sur l'échec
+      - name: Send failure notification
+        uses: julb/action-post-googlechat-message@v1
+        with:
+          message: "Pipeline failed for commit ${{ github.sha }} on branch ${{ github.ref }}."
+          gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
+        if: ${{ failure() }}
