@@ -73,3 +73,17 @@ jobs:
           message: "Pipeline failed for commit ${{ github.sha }} on branch ${{ github.ref }}."
           gchat_webhook_url: ${{ secrets.GCHAT_WEBHOOK_URL }}
         if: ${{ failure() }}
+
+
+      # --- SECTION KUBERNETES ---
+       # Étape 9 : Configurer kubectl
+      - name: Setup kubectl
+        run: |
+          echo "${{ secrets.KUBECONFIG_CONTENT }}" > $HOME/.kube/config
+
+      # Étape 10 : Appliquer le fichier deployment.yaml
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f deployment.yaml
+          kubectl apply -f service.yaml
+          kubectl apply -f ingress.yaml # Si vous avez un Ingress configuré
