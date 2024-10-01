@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-s3-ingress
+spec:
+  rules:
+  - host: my-s3.ddns.net  
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: my-s3-clone-service
+              port:
+                number: 9090

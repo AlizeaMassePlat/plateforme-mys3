@@ -72,6 +72,7 @@ jobs:
         run: |
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
+          kubectl apply -f ingress.yaml
 
       # Étape 10 : Extraire les informations du déploiement et du service
       - name: Extract Kubernetes deployment and service info
