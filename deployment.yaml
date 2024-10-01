@@ -17,6 +17,14 @@ spec:
       containers:
       - name: my-s3-clone
         image: alizeamasseplat/my-s3-clone:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
         ports:
         - containerPort: 9090 
         env:
