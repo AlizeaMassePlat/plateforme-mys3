@@ -5,7 +5,7 @@ metadata:
   labels:
     app: my-s3-clone
 spec:
-  replicas: 2  # Nombre de pods
+  replicas: 1
   selector:
     matchLabels:
       app: my-s3-clone
