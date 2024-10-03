@@ -19,6 +19,8 @@ func SetupRouterWithStorage(s storage.Storage) *mux.Router {
     r := mux.NewRouter()
     r.Use(middleware.LogRequestMiddleware)
     r.Use(middleware.LogResponseMiddleware)
+    r.Use(middleware.CorsMiddleware)
+    
 
     // Health check route
     r.HandleFunc("/probe-bsign{suffix:.*}", func(w http.ResponseWriter, r *http.Request) {

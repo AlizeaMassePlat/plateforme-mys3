@@ -69,3 +69,26 @@ func LogResponseMiddleware(next http.Handler) http.Handler {
         log.Printf("Response body: %s", lrw.responseBody.String())
     })
 }
+
+// CorsMiddleware permet de configurer les en-têtes CORS
+func CorsMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Autorise les requêtes provenant de localhost:3000 (dans votre cas)
+        w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+        
+        // Autorise les méthodes HTTP spécifiques
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        
+        // Autorise les en-têtes spécifiques
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        
+        // Si c'est une requête OPTIONS, on renvoie simplement les en-têtes CORS
+        if r.Method == http.MethodOptions {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+        
+        // Appelle le prochain handler dans la chaîne
+        next.ServeHTTP(w, r)
+    })
+}
