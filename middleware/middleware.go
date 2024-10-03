@@ -73,7 +73,7 @@ func LogResponseMiddleware(next http.Handler) http.Handler {
 // CorsMiddleware permet de configurer les en-têtes CORS
 func CorsMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // Autorise les requêtes provenant de localhost:3000 (dans votre cas)
+        // Autorise les requêtes provenant de localhost:3000 
         w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
         
         // Autorise les méthodes HTTP spécifiques
