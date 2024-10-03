@@ -194,16 +194,33 @@ func (fs *FileStorage) ListObjects(bucketName, prefix, marker string, maxKeys in
 // Lister les buckets
 func (fs *FileStorage) ListBuckets() []string {
     var buckets []string
+
+    // Ajout de log pour vérifier si le répertoire existe
+    log.Printf("Vérification de l'existence du répertoire de stockage des buckets : %s", storageRoot)
+
     files, err := os.ReadDir(storageRoot)
     if err != nil {
+        log.Printf("Erreur lors de la lecture du répertoire %s : %v", storageRoot, err)
         return buckets
     }
 
+    // Ajout de log pour voir combien de fichiers/répertoires sont trouvés
+    log.Printf("Nombre d'éléments trouvés dans le répertoire %s : %d", storageRoot, len(files))
+
+    // Parcourir chaque élément trouvé
     for _, file := range files {
         if file.IsDir() {
+            // Ajout de log pour chaque répertoire trouvé
+            log.Printf("Bucket trouvé : %s", file.Name())
             buckets = append(buckets, file.Name())
+        } else {
+            // Si un fichier est trouvé au lieu d'un répertoire, le signaler
+            log.Printf("Fichier non attendu trouvé dans le répertoire des buckets : %s", file.Name())
         }
     }
+
+    // Ajout de log pour indiquer la fin de la fonction et le nombre total de buckets trouvés
+    log.Printf("Nombre total de buckets trouvés : %d", len(buckets))
 
     return buckets
 }
