@@ -4,15 +4,18 @@ metadata:
   name: my-s3-clone-deployment
   labels:
     app: my-s3-clone
+    owner: alizea 
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: my-s3-clone
+      owner: alizea 
   template:
     metadata:
       labels:
         app: my-s3-clone
+        owner: alizea 
     spec:
       containers:
       - name: my-s3-clone
