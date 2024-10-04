@@ -6,6 +6,28 @@ import (
     "log"
     "bytes"
 )
+// CorsMiddleware permet de configurer les en-têtes CORS
+func CORSMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Log pour suivre les requêtes qui passent par le middleware
+        log.Printf("CORS Middleware: %s %s", r.Method, r.URL.Path)
+
+        // Ajouter les en-têtes CORS pour permettre l'accès depuis http://localhost:3000
+        w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+        // Si c'est une requête preflight OPTIONS, renvoyer un statut 200
+        if r.Method == "OPTIONS" {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+
+        // Passer la requête au prochain handler si ce n'est pas une requête preflight
+        next.ServeHTTP(w, r)
+    })
+}
 
 func BasicAuthMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -67,28 +89,5 @@ func LogResponseMiddleware(next http.Handler) http.Handler {
         // Log la réponse
         log.Printf("Response status: %d", lrw.statusCode)
         log.Printf("Response body: %s", lrw.responseBody.String())
-    })
-}
-
-// CorsMiddleware permet de configurer les en-têtes CORS
-func CorsMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // Autorise les requêtes provenant de localhost:3000 
-        w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-        
-        // Autorise les méthodes HTTP spécifiques
-        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        
-        // Autorise les en-têtes spécifiques
-        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        
-        // Si c'est une requête OPTIONS, on renvoie simplement les en-têtes CORS
-        if r.Method == http.MethodOptions {
-            w.WriteHeader(http.StatusOK)
-            return
-        }
-        
-        // Appelle le prochain handler dans la chaîne
-        next.ServeHTTP(w, r)
     })
 }

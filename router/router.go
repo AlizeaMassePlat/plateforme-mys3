@@ -17,10 +17,10 @@ func SetupRouter() *mux.Router {
 // SetupRouterWithStorage allows injecting custom storage (e.g., mock storage for tests)
 func SetupRouterWithStorage(s storage.Storage) *mux.Router {
     r := mux.NewRouter()
+    
+    r.Use(middleware.CORSMiddleware)
     r.Use(middleware.LogRequestMiddleware)
     r.Use(middleware.LogResponseMiddleware)
-    r.Use(middleware.CorsMiddleware)
-    
 
     // Health check route
     r.HandleFunc("/probe-bsign{suffix:.*}", func(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,7 @@ func SetupRouterWithStorage(s storage.Storage) *mux.Router {
 
     // Bucket-specific routes
     r.HandleFunc("/{bucketName}/", handlers.HandleGetBucket(s)).Methods("GET")
-    r.HandleFunc("/{bucketName}/", handlers.HandleCreateBucket(s)).Methods("PUT")
+    r.HandleFunc("/{bucketName}/", handlers.HandleCreateBucket(s)).Methods("PUT", "OPTIONS")
     r.HandleFunc("/{bucketName}/", handlers.HandleDeleteBucket(s)).Methods("DELETE")
 
     // Route for listing all buckets
