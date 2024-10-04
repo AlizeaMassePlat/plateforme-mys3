@@ -9,22 +9,21 @@ import (
 // CorsMiddleware permet de configurer les en-têtes CORS
 func CORSMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // Log pour suivre les requêtes qui passent par le middleware
-        log.Printf("CORS Middleware: %s %s", r.Method, r.URL.Path)
-
-        // Ajouter les en-têtes CORS pour permettre l'accès depuis http://localhost:3000
+        // Autoriser les origines spécifiques
         w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+        
+        // Autoriser les méthodes HTTP
         w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        w.Header().Set("Access-Control-Allow-Credentials", "true")
-
-        // Si c'est une requête preflight OPTIONS, renvoyer un statut 200
+        
+        // Autoriser les en-têtes spécifiques
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Amz-Content-Sha256, X-Amz-Decoded-Content-Length")
+        
+        // Gérer les requêtes preflight (OPTIONS)
         if r.Method == "OPTIONS" {
             w.WriteHeader(http.StatusOK)
             return
         }
 
-        // Passer la requête au prochain handler si ce n'est pas une requête preflight
         next.ServeHTTP(w, r)
     })
 }
