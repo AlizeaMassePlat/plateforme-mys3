@@ -1,23 +1,24 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: networking.k8s.io/v1  # Version de l'API utilisée pour les objets de type Ingress
+kind: Ingress  # Déclare que cet objet est un Ingress
 metadata:
-  name: my-s3-ingress
+  name: my-s3-ingress  # Nom de l'Ingress
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt
+    cert-manager.io/cluster-issuer: letsencrypt  # Annotation pour utiliser Cert-Manager avec Let's Encrypt pour obtenir un certificat SSL/TLS
+
 spec:
-  rules:
-  - host: my-s3.cdpi.atelier.ovh
+  rules:  # Liste des règles de routage définies par l'Ingress
+  - host: my-s3.cdpi.atelier.ovh  # Domaine ou sous-domaine pour lequel cette règle s'applique
     http:
-      paths:
-        - path: /
-          pathType: Prefix
+      paths:  # Définit les chemins à rediriger vers le service approprié
+        - path: /  # Chemin à capturer (ici la racine, donc tout)
+          pathType: Prefix  # Type de correspondance, ici "Prefix" pour capturer tout ce qui commence par "/"
           backend:
             service:
-              name: my-s3-clone-service
+              name: my-s3-clone-service  # Nom du service vers lequel le trafic est redirigé
               port:
-                number: 9090
-  
-  tls:
+                number: 9090  # Port du service cible
+
+  tls:  # Configuration TLS pour sécuriser le domaine
   - hosts:
-    - my-s3.cdpi.atelier.ovh
-    secretName: my-s3-tls
+    - my-s3.cdpi.atelier.ovh  # Le domaine pour lequel on demande le certificat TLS
+    secretName: my-s3-tls  # Nom du secret où sera stocké le certificat TLS généré par Let's Encrypt

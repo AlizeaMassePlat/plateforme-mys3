@@ -1,35 +1,41 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: apps/v1  # Version de l'API pour les objets de type Deployment
+kind: Deployment  # Déclare que cet objet est un Deployment
 metadata:
-  name: my-s3-clone-deployment
+  name: my-s3-clone-deployment  # Nom du Deployment
   labels:
-    app: my-s3-clone
-    owner: alizea 
+    app: my-s3-clone  # Label pour identifier l'application
+    owner: alizea  # Label supplémentaire pour identifier le propriétaire, utile pour le filtrage
+
 spec:
-  replicas: 1
+  replicas: 1  # Nombre de réplicas du pod à exécuter
   selector:
     matchLabels:
-      app: my-s3-clone
-      owner: alizea 
+      app: my-s3-clone  # Définit les pods que ce Deployment gère via des labels
+      owner: alizea  # Ajout d'un label spécifique pour affiner la correspondance des pods
+
   template:
     metadata:
       labels:
-        app: my-s3-clone
-        owner: alizea 
+        app: my-s3-clone  # Labels appliqués aux pods créés
+        owner: alizea  # Permet d'identifier à qui appartient ce pod
+
     spec:
       containers:
-      - name: my-s3-clone
-        image: alizeamasseplat/my-s3-clone:latest
-        imagePullPolicy: Always
+      - name: my-s3-clone  # Nom du conteneur
+        image: alizeamasseplat/my-s3-clone:latest  # Image Docker à utiliser pour le conteneur
+        imagePullPolicy: Always  # Indique que l'image doit être systématiquement récupérée (même si elle existe localement)
+
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "250m"
+            memory: "64Mi"  # Quantité minimum de mémoire à réserver pour ce conteneur
+            cpu: "250m"  # Quantité minimum de CPU à réserver pour ce conteneur (ici 250 milli-cores)
           limits:
-            memory: "128Mi"
-            cpu: "500m"
+            memory: "128Mi"  # Limite maximale de mémoire que le conteneur peut utiliser
+            cpu: "500m"  # Limite maximale de CPU que le conteneur peut utiliser (ici 500 milli-cores)
+
         ports:
-        - containerPort: 9090 
+        - containerPort: 9090  # Port exposé par le conteneur 
+
         env:
-        - name: ENV_VARIABLE
-          value: "development"  
+        - name: ENV_VARIABLE  # Variable d'environnement à définir dans le conteneur
+          value: "development"  # Valeur de la variable d'environnement
